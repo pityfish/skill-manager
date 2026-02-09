@@ -260,7 +260,11 @@ def sync_to_platforms(
 
 
 def update_sync_metadata(
-    skill_name: str, selected_ids: list[str], available_platforms: dict
+    skill_name: str,
+    selected_ids: list[str],
+    available_platforms: dict,
+    source_type: str = "unknown",
+    source_url: Optional[str] = None,
 ):
     """Update metadata file with sync information."""
     metadata = config.load_metadata()
@@ -286,6 +290,8 @@ def update_sync_metadata(
 
     metadata[skill_name] = {
         "source": str(config.SKILL_REPO / skill_name),
+        "source_type": source_type,
+        "source_url": source_url,
         "targets": valid_targets,
     }
     config.save_metadata(metadata)
@@ -364,7 +370,10 @@ def main():
         )
 
         # Update metadata
-        update_sync_metadata(skill_name, sync_targets, available_platforms)
+        source_type = config.SOURCE_TYPE_GIT if is_git else config.SOURCE_TYPE_LOCAL
+        update_sync_metadata(
+            skill_name, sync_targets, available_platforms, source_type, source_input
+        )
 
         print(f"\n✅ Skill '{skill_name}' setup complete!")
 
