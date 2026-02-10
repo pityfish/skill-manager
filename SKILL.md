@@ -1,6 +1,6 @@
 ---
 name: skill-manager
-description: The official Skill Manager for AI Agents. Use this to find, install, sync, and manage skills (MCP servers) for yourself and other agents.
+description: The Skill Manager for AI Agents. Use this to find, install, sync, and manage skills for yourself and other agents.
 ---
 
 # Agent Skill Manager (ASM)
@@ -42,8 +42,8 @@ python3 scripts/list_skills.py
 ```
 *Tip: Pay attention to the `Sync Status` column.*
 
-### 4. � Sync/Fix Skill
-**Usage**: 
+### 4. 🔄 Sync/Fix Skill
+**Usage**:
 1. If installed skills are **missing** from your tool list.
 2. To register an existing skill with a newly added agent.
 **Command**:

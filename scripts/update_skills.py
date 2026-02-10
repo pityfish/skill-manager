@@ -339,9 +339,10 @@ def main():
     )
     args = parser.parse_args()
 
-    targets = []
+    # Determine mode
+    non_interactive = args.npx or args.all or args.skills
 
-    # Handle --npx flag
+    # 1. Handle --npx flag
     if args.npx:
         print("\n📦 Running 'npx skills update'...\n")
         try:
@@ -351,11 +352,11 @@ def main():
             print(f"\n❌ npx skills update failed: {e}")
         except FileNotFoundError:
             print("\n❌ npx not found. Please install Node.js first.")
-        return
 
+    # 2. Identify Git targets
+    targets = []
     all_skills_map = config.get_all_skills_with_sources()
 
-    # 1. Update specific skills from args
     if args.skills:
         for name in args.skills:
             if name not in all_skills_map:
@@ -367,8 +368,10 @@ def main():
             source_type = info.get("source_type")
 
             if source_type == config.SOURCE_TYPE_NPX:
-                print(f"📦 Skill '{name}' was installed via npx skills.")
-                print(f"   Run 'npx skills update' to update it.")
+                # If user specifically asked for an npx skill by name, remind them
+                if not args.npx:
+                    print(f"📦 Skill '{name}' is an npx skill.")
+                    print(f"   Run with --npx to update.")
                 continue
             elif source_type == config.SOURCE_TYPE_LOCAL:
                 print(f"📁 Skill '{name}' is a local skill (no git repo).")
@@ -380,23 +383,26 @@ def main():
 
             targets.append((name, path, source_type, "git"))
 
-    # 2. Update all Git-based if --all flag
     elif args.all:
         all_skills = get_all_updatable_skills()
         for name, path, source_type, source_info, scope in all_skills:
             if source_type == config.SOURCE_TYPE_GIT or (path / ".git").exists():
                 targets.append((name, path, source_type, "git"))
 
-    # 3. Interactive mode if no args
-    else:
+    # 3. Interactive mode (only if no flags set)
+    elif not non_interactive:
         all_skills = get_all_updatable_skills()
         if not all_skills:
             print("📭 No skills found to update.")
             return
         targets = ask_skills_to_update(all_skills)
 
-    if not targets:
+    if not targets and not args.npx:
+        # If we didn't run npx and selected no targets, exit
         print("No skills selected.")
+        return
+    elif not targets:
+        # We ran npx but have no git targets, we are done
         return
 
     # Check for npx update request
