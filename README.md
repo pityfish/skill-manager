@@ -80,15 +80,26 @@ python3 scripts/install_skill.py https://github.com/user/project-tool.git --scop
 ```
 
 **3. Sync & Update**
+```bash
 # Interactive TUI (Select skills to update)
 python3 scripts/update_skills.py
 
+# Smart Update specified skill (Auto-detects Git pull vs npx skills update)
+python3 scripts/update_skills.py <skill-name>
+
 # Auto-Update All
 python3 scripts/update_skills.py --all --npx
+```
 
 **4. Check what your Agent can do**
 ```bash
 python3 scripts/list_skills.py
+```
+
+**5. Clean Uninstall**
+```bash
+# Removes from Central Repo, Registry (if npx), and all synced agents
+python3 scripts/uninstall_skill.py <skill-name>
 ```
 
 ## 🔌 Supported Agents
@@ -141,4 +152,4 @@ python3 scripts/list_skills.py
 A: Ensure you selected the correct scope in the TUI menu, or run `python3 scripts/list_skills.py` to check the detailed sync status and repository paths.
 
 **Q: How do I remove a skill?**
-A: `python3 scripts/uninstall_skill.py <skill-name>`
+A: `python3 scripts/uninstall_skill.py <skill-name>`. It will automatically trigger `npx skills remove` if it's a registry skill.

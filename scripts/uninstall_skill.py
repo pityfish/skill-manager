@@ -31,6 +31,26 @@ def remove_path(path: Path) -> bool:
     return False
 
 
+def remove_npx_skill(skill_name: str, scope: str = "project") -> bool:
+    """Remove a skill via npx skills remove."""
+    cmd = ["npx", "skills", "remove", skill_name, "-y"]
+    if scope == "global":
+        cmd.append("-g")
+
+    print(f"   ⚙️  Running '{' '.join(cmd)}'...")
+    try:
+        # For project scope, we should be in PROJECT_ROOT
+        cwd = str(config.PROJECT_ROOT) if scope == "project" else None
+        subprocess.run(cmd, cwd=cwd, check=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"   ❌ npx skills remove failed: {e}")
+        return False
+    except FileNotFoundError:
+        print("   ❌ npx not found. Cannot remove via Registry.")
+        return False
+
+
 def get_skill_locations(skill_name: str) -> dict:
     """Get all locations where skill exists (Global & Project)."""
     locations = {}
@@ -146,7 +166,25 @@ def uninstall_skill_selective(
     """Uninstall skill from selected locations only."""
     print(f"\n🗑️  Removing '{skill_name}'...\n")
 
-    removed_any = False
+    # 1. Check if we are removing from a Repo that is managed by NPX
+    removed_via_npx = set()
+
+    for key in selected_keys:
+        info = locations.get(key)
+        if not info or "repo" not in key:
+            continue
+
+        scope = info["scope"]
+        source_type, _ = config.get_skill_source_type(skill_name, scope=scope)
+
+        if source_type == config.SOURCE_TYPE_NPX:
+            if scope not in removed_via_npx:
+                if remove_npx_skill(skill_name, scope):
+                    removed_via_npx.add(scope)
+                    print(f"   ✅ Removed {skill_name} from {scope} Registry")
+
+    # 2. Cleanup remaining paths (in case npx didn't remove everything or for non-npx skills)
+    removed_any = len(removed_via_npx) > 0
 
     for key in selected_keys:
         if key not in locations:
@@ -157,8 +195,9 @@ def uninstall_skill_selective(
         if remove_path(path):
             print(f"   ✅ Removed from {info['name']}: {path}")
             removed_any = True
-        else:
-            print(f"   ⚠️  Not found in {info['name']}: {path}")
+        elif key not in [f"{s}_repo" for s in removed_via_npx]:
+            # Only warn if it wasn't already handle by npx remove
+            pass
 
     # Clean up metadata
     cleanup_metadata(skill_name)
@@ -216,13 +255,15 @@ def main():
     source_type_project, _ = config.get_skill_source_type(skill_name, scope="project")
 
     if source_type_global == config.SOURCE_TYPE_NPX:
-        print(f"\n⚠️  This skill is installed GLOBALLY via 'npx skills'.")
-        print(f"   Recommended: Use 'npx skills remove -g {skill_name}' to uninstall.")
+        print(f"\nℹ️  This skill is installed GLOBALLY via 'npx skills'.")
+        print(
+            f"   Uninstalling will automatically trigger 'npx skills remove -g {skill_name}'."
+        )
 
     if source_type_project == config.SOURCE_TYPE_NPX:
-        print(f"\n⚠️  This skill is installed LOCALLY via 'npx skills'.")
+        print(f"\nℹ️  This skill is installed LOCALLY via 'npx skills'.")
         print(
-            f"   Recommended: Use 'npx skills remove {skill_name}' (in project root) to uninstall."
+            f"   Uninstalling will automatically trigger 'npx skills remove {skill_name}'."
         )
 
     # Try to import TUI

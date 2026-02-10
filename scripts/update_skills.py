@@ -348,10 +348,32 @@ def main():
             source_type = info.get("source_type")
 
             if source_type == config.SOURCE_TYPE_NPX:
-                # If user specifically asked for an npx skill by name, remind them
-                if not args.npx:
-                    print(f"📦 Skill '{name}' is an npx skill.")
-                    print(f"   Run with --npx to update.")
+                scope = info.get("scope", "project")
+                print(f"📦 Skill '{name}' is an npx skill (Scope: {scope}).")
+                if scope == "global":
+                    print("   Running 'npx skills update -g' (Global)...")
+                    try:
+                        subprocess.run(["npx", "skills", "update", "-g"], check=True)
+                        print(
+                            f"✅ Global Registry update complete (includes '{name}')."
+                        )
+                    except Exception as e:
+                        print(f"❌ Global update failed: {e}")
+                else:
+                    print(
+                        f"   Running 'npx skills update' (Project: {config.PROJECT_ROOT})..."
+                    )
+                    try:
+                        subprocess.run(
+                            ["npx", "skills", "update"],
+                            cwd=str(config.PROJECT_ROOT),
+                            check=True,
+                        )
+                        print(
+                            f"✅ Project Registry update complete (includes '{name}')."
+                        )
+                    except Exception as e:
+                        print(f"❌ Project update failed: {e}")
                 continue
             elif source_type == config.SOURCE_TYPE_LOCAL:
                 print(f"📁 Skill '{name}' is a local skill (no git repo).")

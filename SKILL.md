@@ -51,14 +51,17 @@ python3 scripts/list_skills.py
 python3 scripts/sync_skill.py <skill_name>
 ```
 
-### 5. 🆙 Update All Skills
-**Usage**: Update all installed skills to their latest versions.
+### 5. 🆙 Update Skills
+**Usage**: Update installed skills to their latest versions.
 **Command**:
 ```bash
 # Interactive Mode
 python3 scripts/update_skills.py
 
-# Automated Mode (Recommended for Agents)
+# Smart Update Single Skill (Auto-detects Git vs Registry)
+python3 scripts/update_skills.py <skill_name>
+
+# Automated Update All (Recommended for periodic maintenance)
 python3 scripts/update_skills.py --all --npx
 ```
 
@@ -68,6 +71,7 @@ python3 scripts/update_skills.py --all --npx
 ```bash
 python3 scripts/uninstall_skill.py <skill_name>
 ```
+*Note: This automatically triggers `npx skills remove` for Registry skills.*
 
 ## 🧠 Agent Protocol
 

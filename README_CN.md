@@ -80,15 +80,26 @@ python3 scripts/install_skill.py https://github.com/user/project-tool.git --scop
 ```
 
 **3. 同步与更新**
+```bash
 # 交互式更新 (TUI 按需勾选)
 python3 scripts/update_skills.py
 
+# 智能更新指定技能 (自动识别该技能来源并执行相应更新)
+python3 scripts/update_skills.py <技能名称>
+
 # 一键自动更新 (推荐)
 python3 scripts/update_skills.py --all --npx
+```
 
 **4. 查看 Agent 当前能做什么**
 ```bash
 python3 scripts/list_skills.py
+```
+
+**5. 彻底卸载**
+```bash
+# 从中央仓库、Registry (如果是 npx 来源) 以及所有同步的 Agent 中移除
+python3 scripts/uninstall_skill.py <技能名称>
 ```
 
 ## 🔌 支持的智能体
@@ -141,4 +152,4 @@ python3 scripts/list_skills.py
 A: 确保你在 TUI 菜单中选择了正确的作用域，或者运行 `python3 scripts/list_skills.py` 检查详细的同步状态和仓库路径。
 
 **Q: 怎么卸载技能？**
-A: `python3 scripts/uninstall_skill.py <skill-name>`
+A: `python3 scripts/uninstall_skill.py <skill-name>`。如果它是 Registry 技能，脚本会自动触发 `npx skills remove`。
