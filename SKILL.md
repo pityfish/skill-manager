@@ -20,8 +20,10 @@ npx skills find <search_query>
 **Usage**: When you identify a package or Git repo to install.
 
 **Decision Logic (Scope)**:
-- **Global**: For general-purpose tools (e.g., `browser`, `clipboard`, `shell`) that should be available in **ALL** your workspaces. Select this in the TUI when prompted.
+- **Global**: For general-purpose tools (e.g., `browser`, `clipboard`, `shell`) that should be available in **ALL** your workspaces.
 - **Project**: For workspace-specific tools (e.g., `linter`, `test-runner`) that are only relevant to the current project.
+
+**Interactive Flow**: The script will **always** prompt you to select the scope via TUI unless specified.
 
 **Commands**:
 ```bash
@@ -30,8 +32,7 @@ npx skills add <package_name> -g -y  # Global Install
 npx skills add <package_name> -y     # Project Install
 
 # Option B: From Git URL (Custom/Private)
-python3 scripts/install_skill.py <git_url> --scope global
-python3 scripts/install_skill.py <git_url> --scope project
+python3 scripts/install_skill.py <git_url>
 ```
 
 ### 3. 📋 List & Check Status
@@ -53,9 +54,10 @@ python3 scripts/sync_skill.py <skill_name>
 
 ### 5. 🆙 Update Skills
 **Usage**: Update installed skills to their latest versions.
+**Interactive Flow**: Select Scope (Global/Project) -> Select Skills to update.
 **Command**:
 ```bash
-# Interactive Mode
+# Interactive Mode (Recommended)
 python3 scripts/update_skills.py
 
 # Smart Update Single Skill (Auto-detects Git vs Registry)
@@ -67,16 +69,19 @@ python3 scripts/update_skills.py --all --npx
 
 ### 6. 🗑️ Uninstall Skill
 **Usage**: Remove a skill and clean up its configuration.
+**Interactive Flow**:
+- **Option A (TUI Guided)**: Run without arguments to select Scope -> select Skills.
+- **Option B (Direct)**: Provide skill name; it will ask for scope if it exists in both.
 **Command**:
 ```bash
-python3 scripts/uninstall_skill.py <skill_name>
+python3 scripts/uninstall_skill.py [skill_name]
 ```
 *Note: This automatically triggers `npx skills remove` for Registry skills.*
 
 ## 🧠 Agent Protocol
 
 1.  **Search First**: Do not assume tools exist. Use `npx skills find` to discover availability.
-2.  **Verify Scope**: Always determine if a tool is "Global" (meant for you, the agent) or "Project" (meant for the repo).
+2.  **Verify Scope**: Always determine if a tool is "Global" (meant for you, the agent) or "Project" (meant for the repo). **Expect a TUI prompt to confirm this.**
 3.  **Self-Correction**:
     -   If you install a tool but cannot see it: **DO NOT install again**.
     -   Run `python3 scripts/list_skills.py` to verify it exists.

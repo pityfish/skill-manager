@@ -160,6 +160,38 @@ def cleanup_metadata(skill_name: str):
             # print(f"   ✅ Updated {scope} metadata")
 
 
+def ask_skill_to_uninstall(scope: str) -> list[str]:
+    """Interactive TUI menu to select a skill to uninstall from a specific scope."""
+    # Try to import TUI
+    sys.path.append(str(Path(__file__).parent))
+    try:
+        import tui
+    except ImportError:
+        return []
+
+    skills_with_sources = config.get_all_skills_with_sources(scope=scope)
+    if not skills_with_sources:
+        print(f"📭 No skills found in {scope} scope.")
+        return []
+
+    options = []
+    for key, info in sorted(skills_with_sources.items()):
+        name = info.get("original_name", key)
+        path = info["path"]
+        source_type = info.get("source_type", config.SOURCE_TYPE_UNKNOWN)
+        icon = config.get_source_type_icon(source_type)
+        label = f"{icon} {name} ({path})"
+        options.append({"id": name, "label": label, "checked": False})
+
+    menu = tui.MultiSelectMenu(
+        f"Select skills to uninstall from {scope.capitalize()}", options
+    )
+    try:
+        return menu.run()
+    except KeyboardInterrupt:
+        return []
+
+
 def uninstall_skill_selective(
     skill_name: str, selected_keys: list[str], locations: dict
 ):
@@ -209,12 +241,39 @@ def uninstall_skill_selective(
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: uninstall_skill.py <skill-name>")
-        sys.exit(1)
+    skill_name = sys.argv[1] if len(sys.argv) > 1 else None
 
-    skill_name = sys.argv[1]
+    # Case 1: Interactive mode (no skill name specified)
+    if not skill_name:
+        selected_scope = config.ask_scope_tui(
+            "Which scope do you want to uninstall from?"
+        )
+        skills_to_remove = ask_skill_to_uninstall(selected_scope)
 
+        if not skills_to_remove:
+            print("❌ No skills selected for uninstallation.")
+            return
+
+        for name in skills_to_remove:
+            print(f"\n--- Processing '{name}' ---")
+            locations = get_skill_locations(name)
+            # Filter locations to only the selected scope
+            scope_locations = {
+                k: v for k, v in locations.items() if v["scope"] == selected_scope
+            }
+            if not scope_locations:
+                print(
+                    f"⚠️  Unexpected error: Skill '{name}' not found in {selected_scope} scope anymore."
+                )
+                continue
+
+            # In this fully interactive mode, we take all locations in that scope (repo + agents)
+            uninstall_skill_selective(
+                name, list(scope_locations.keys()), scope_locations
+            )
+        return
+
+    # Case 2: Specified skill name via CLI
     # Find where skill exists
     locations = get_skill_locations(skill_name)
 
@@ -222,51 +281,41 @@ def main():
         print(f"❌ Skill '{skill_name}' not found in any location (Global or Project).")
         sys.exit(1)
 
-    # Count synced symlinks
-    synced_symlinks = get_synced_symlinks(skill_name, locations)
-
     # Detect active scopes
     has_global = any(l["scope"] == "global" for l in locations.values())
     has_project = any(l["scope"] == "project" for l in locations.values())
 
-    # Determine default scope based on Context
-    # If we are effectively in a project (config.PROJECT_ROOT has .agents or .git), prefer project
-    is_in_project = (config.PROJECT_ROOT / ".agents").exists() or (
-        config.PROJECT_ROOT / ".git"
-    ).exists()
+    selected_scope = None
+    if has_global and has_project:
+        selected_scope = config.ask_scope_tui(
+            f"Skill '{skill_name}' found in both scopes. Select which one to process:"
+        )
+    elif has_global:
+        selected_scope = "global"
+    elif has_project:
+        selected_scope = "project"
 
-    default_scope = "project" if (is_in_project and has_project) else "global"
-    if default_scope == "global" and not has_global and has_project:
-        default_scope = "project"
+    # Filter locations to selected scope
+    final_locations = {
+        k: v for k, v in locations.items() if v["scope"] == selected_scope
+    }
+    synced_symlinks = get_synced_symlinks(skill_name, final_locations)
 
-    print(f"\n📦 Skill '{skill_name}' found in:")
-
-    for key, info in locations.items():
+    print(f"\n📦 Skill '{skill_name}' ({selected_scope.capitalize()}) found in:")
+    for key, info in final_locations.items():
         type_str = "symlink" if info["is_symlink"] else "directory"
         synced_mark = " (synced)" if key in synced_symlinks else ""
-        scope_icon = "🌍" if info["scope"] == "global" else "🏠"
+        print(f"   {info['name']}: {info['path']} [{type_str}]{synced_mark}")
+
+    # Check source type for NPX logic
+    source_type, _ = config.get_skill_source_type(skill_name, scope=selected_scope)
+    if source_type == config.SOURCE_TYPE_NPX:
         print(
-            f"   {scope_icon} {info['name']}: {info['path']} [{type_str}]{synced_mark}"
+            f"\nℹ️  This skill is installed via 'npx skills' in {selected_scope} scope."
         )
+        print(f"   Uninstalling will automatically trigger 'npx skills remove'.")
 
-    # Check source type for npx warning
-    # We check global first, then project
-    source_type_global, _ = config.get_skill_source_type(skill_name, scope="global")
-    source_type_project, _ = config.get_skill_source_type(skill_name, scope="project")
-
-    if source_type_global == config.SOURCE_TYPE_NPX:
-        print(f"\nℹ️  This skill is installed GLOBALLY via 'npx skills'.")
-        print(
-            f"   Uninstalling will automatically trigger 'npx skills remove -g {skill_name}'."
-        )
-
-    if source_type_project == config.SOURCE_TYPE_NPX:
-        print(f"\nℹ️  This skill is installed LOCALLY via 'npx skills'.")
-        print(
-            f"   Uninstalling will automatically trigger 'npx skills remove {skill_name}'."
-        )
-
-    # Try to import TUI
+    # Try to import TUI for location selection
     sys.path.append(str(Path(__file__).parent))
     try:
         import tui
@@ -274,73 +323,39 @@ def main():
         tui = None
 
     if not tui:
-        print("\n⚠️  TUI module missing. Please use standard inputs.")
-        # Fallback: Select all locations for removal
-        keys_to_remove = list(locations.keys())
-        print(f"   Selecting ALL locations for removal (fallback).")
+        keys_to_remove = list(final_locations.keys())
     else:
-        # Prepare TUI Options
         options = []
-        sections = []
-
-        # Group keys by scope
-        project_keys = [k for k, v in locations.items() if v["scope"] == "project"]
-        global_keys = [k for k, v in locations.items() if v["scope"] == "global"]
-
-        # Determine defaults
-        # If default is project, check project items.
-        # If default is global, check global items.
-        check_project = default_scope == "project"
-        check_global = default_scope == "global"
-
-        # Project Section
-        if project_keys:
-            sections.append({"title": "Project Scope", "start_index": len(options)})
-            for key in project_keys:
-                info = locations[key]
-                options.append(
-                    {
-                        "id": key,
-                        "label": f"{info['name']} ({info['path']})",
-                        "checked": check_project,
-                    }
-                )
-
-        # Global Section
-        if global_keys:
-            sections.append({"title": "Global Scope", "start_index": len(options)})
-            for key in global_keys:
-                info = locations[key]
-                options.append(
-                    {
-                        "id": key,
-                        "label": f"{info['name']} ({info['path']})",
-                        "checked": check_global,
-                    }
-                )
+        for key, info in final_locations.items():
+            options.append(
+                {
+                    "id": key,
+                    "label": f"{info['name']} ({info['path']})",
+                    "checked": True,
+                }
+            )
 
         menu = tui.MultiSelectMenu(
-            "Select locations to uninstall from", options, sections
+            f"Confirm items to remove from {selected_scope} scope", options
         )
-        print("\033[2m  ↑↓ move, space select, enter confirm\033[0m")
-
         try:
             keys_to_remove = menu.run()
         except KeyboardInterrupt:
-            print("\n❌ Cancelled.")
             sys.exit(0)
 
     if not keys_to_remove:
         print("❌ No locations selected.")
-        sys.exit(0)
+        return
 
     # Confirmation
-    print(f"\n⚠️  Will remove {len(keys_to_remove)} item(s).")
+    print(
+        f"\n⚠️  Will remove {len(keys_to_remove)} item(s) from {selected_scope} scope."
+    )
     if input("Confirm? [y/N]: ").strip().lower() != "y":
         print("❌ Cancelled.")
-        sys.exit(0)
+        return
 
-    uninstall_skill_selective(skill_name, keys_to_remove, locations)
+    uninstall_skill_selective(skill_name, keys_to_remove, final_locations)
 
 
 if __name__ == "__main__":

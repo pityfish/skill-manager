@@ -206,40 +206,7 @@ def create_symlink(source: Path, target: Path, force: bool = False):
     target.symlink_to(source)
 
 
-def ask_installation_scope() -> str:
-    """Prompt user to select installation scope using TUI (Project or Global)."""
-    # Try to import TUI
-    try:
-        import tui
-    except ImportError:
-        # Fallback if tui.py missing
-        sys.path.append(str(Path(__file__).parent))
-        try:
-            import tui
-        except ImportError:
-            tui = None
-
-    if not tui:
-        # Silent fallback or simple prompt?
-        return "project"
-
-    options = [
-        {
-            "id": "project",
-            "label": "Project (Install in current directory (committed with your project))",
-            "checked": True,
-        },
-        {"id": "global", "label": "Global", "checked": False},
-    ]
-
-    menu = tui.MultiSelectMenu("Installation scope", options, single_select=True)
-
-    try:
-        selection = menu.run()
-        return selection if selection else "project"
-    except KeyboardInterrupt:
-        print("\n❌ Cancelled.")
-        sys.exit(0)
+# Using config.ask_scope_tui instead
 
 
 def ask_sync_targets(available_platforms: dict, is_local: bool) -> list[str]:
@@ -446,7 +413,7 @@ def main():
 
     # Auto-detect scope if not provided
     if args.scope is None:
-        args.scope = ask_installation_scope()
+        args.scope = config.ask_scope_tui("Installation scope")
 
     source_input = args.skill_path
     is_git = False

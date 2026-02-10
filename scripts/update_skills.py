@@ -135,27 +135,30 @@ def update_npx_skill(skill_name: str) -> str:
         return "error: npx not found"
 
 
-def get_all_updatable_skills():
+def get_all_updatable_skills(scope: str = None):
     """
-    Return a list of (skill_name, path, source_type, source_info, scope) for all updatable skills.
+    Return a list of (skill_name, path, source_type, source_info, scope) for updatable skills.
     """
     skills = []
 
-    skills_with_sources = config.get_all_skills_with_sources()
+    skills_with_sources = config.get_all_skills_with_sources(scope=scope)
 
     for name, info in sorted(skills_with_sources.items()):
+        # Handle original_name if it was a collision key
+        skill_name = info.get("original_name", name)
         path = info["path"]
         source_type = info.get("source_type", config.SOURCE_TYPE_UNKNOWN)
         source_info = info.get("source_info", {})
-        scope = info.get("scope", "unknown")
+        scope_val = info.get("scope", "unknown")
 
-        skills.append((name, path, source_type, source_info, scope))
+        skills.append((skill_name, path, source_type, source_info, scope_val))
 
     return skills
 
 
-def ask_skills_to_update(skills):
+def ask_skills_to_update(skills, selected_scope: str):
     """Interactive TUI menu to select skills for update."""
+    title = f"Select skills to update ({selected_scope.capitalize()})"
     # Try to import TUI
     sys.path.append(str(Path(__file__).parent))
     try:
@@ -280,7 +283,7 @@ def ask_skills_to_update(skills):
         print("   No skills found.")
         return []
 
-    menu = tui.MultiSelectMenu("Select skills to update", options, sections)
+    menu = tui.MultiSelectMenu(title, options, sections)
     print("\033[2m  ↑↓ move, space select, enter confirm\033[0m")
 
     try:
@@ -393,11 +396,13 @@ def main():
 
     # 3. Interactive mode (only if no flags set)
     elif not non_interactive:
-        all_skills = get_all_updatable_skills()
+        selected_scope = config.ask_scope_tui("Which scope do you want to update?")
+        all_skills = get_all_updatable_skills(scope=selected_scope)
+
         if not all_skills:
-            print("📭 No skills found to update.")
+            print(f"📭 No skills found to update in {selected_scope} scope.")
             return
-        targets = ask_skills_to_update(all_skills)
+        targets = ask_skills_to_update(all_skills, selected_scope)
 
     if not targets and not args.npx:
         # If we didn't run npx and selected no targets, exit

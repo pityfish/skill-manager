@@ -370,15 +370,48 @@ def get_skill_source_type(skill_name: str, scope: str = "global") -> tuple[str, 
     return SOURCE_TYPE_UNKNOWN, {}
 
 
-def get_all_skills_with_sources() -> dict:
+def ask_scope_tui(title: str = "Select scope") -> str:
+    """Prompt user to select scope (Global or Project) using TUI."""
+    import sys
+    from pathlib import Path
+
+    try:
+        import tui
+    except ImportError:
+        sys.path.append(str(Path(__file__).parent))
+        try:
+            import tui
+        except ImportError:
+            return "project"
+
+    options = [
+        {
+            "id": "project",
+            "label": "Project (Current directory)",
+            "checked": True,
+        },
+        {"id": "global", "label": "Global (System-wide)", "checked": False},
+    ]
+
+    menu = tui.MultiSelectMenu(title, options, single_select=True)
+    try:
+        selection = menu.run()
+        return selection if selection else "project"
+    except KeyboardInterrupt:
+        print("\n❌ Cancelled.")
+        sys.exit(0)
+
+
+def get_all_skills_with_sources(scope: str = None) -> dict:
     """
-    Get all skills with their source information from both global and project scopes.
+    Get all skills with their source information.
+    If scope is provided, only return skills from that scope.
     Returns: { skill_name: { "source_type": str, "source_info": dict, "path": Path, "scope": str } }
     """
     skills = {}
 
     # Scan global repo
-    if SKILL_REPO_GLOBAL.exists():
+    if (not scope or scope == "global") and SKILL_REPO_GLOBAL.exists():
         for item in SKILL_REPO_GLOBAL.iterdir():
             if item.is_dir() and not item.name.startswith("."):
                 source_type, source_info = get_skill_source_type(
@@ -392,22 +425,27 @@ def get_all_skills_with_sources() -> dict:
                 }
 
     # Scan project repo
-    if SKILL_REPO_PROJECT.exists():
+    if (not scope or scope == "project") and SKILL_REPO_PROJECT.exists():
         for item in SKILL_REPO_PROJECT.iterdir():
             if item.is_dir() and not item.name.startswith("."):
-                # If skill exists in both, project overrides (or we show both? for now let's use list to distinguish)
-                # But for a flat dict, let's prefix key if collision?
-                # Actually, caller might want to know about duplicates.
-                # Let's just add it, potentially overwriting (which implies project takes precedence in this view)
                 source_type, source_info = get_skill_source_type(
                     item.name, scope="project"
                 )
 
-                # If we want to preserve both, we might need a different structure.
-                # But for now, let's just mark it.
                 if item.name in skills:
-                    skills[item.name]["project_override"] = True
-                    skills[item.name]["project_path"] = item
+                    # If skill exists in both, uniquely identify them or keep both
+                    # For filtering purposes, if user asked for "project", they get project.
+                    # If they asked for "None" (all), we might have collision.
+                    # Let's keep the project one but avoid losing the global one if possible.
+                    # Actually, for the manager's list view, we might want unique keys.
+                    key = f"{item.name} (project)" if not scope else item.name
+                    skills[key] = {
+                        "source_type": source_type,
+                        "source_info": source_info,
+                        "path": item,
+                        "scope": "project",
+                        "original_name": item.name,
+                    }
                 else:
                     skills[item.name] = {
                         "source_type": source_type,
