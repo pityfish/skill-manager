@@ -23,8 +23,6 @@
     *   **全局 (Global)**: `~/.agents/skills/` (所有项目共用)
     *   **项目 (Project)**: `./.agents/skills/` (仅限当前项目)
 *   **一次安装，处处可用**: 自动同步到 Claude, Gemini, Cursor, Trae, Replit 等所有平台。
-*   **全流程 TUI 交互**: 安装 (Scope 选择)、更新 (状态检测)、卸载 (一站式清理) 均提供精美的终端交互界面。
-*   **智能维护**: 自动区分技能来源，提供正确的更新方式 (`npx` vs `git`)。
 
 
 ## ⚡️ 你能管理什么？
@@ -34,6 +32,15 @@
 *   **社区技能 (npx)**: 安装 `browser-skill` 让 Agent 获得联网搜索能力。
 *   **私有技能 (Git)**: 克隆公司的 `internal-api-skill` 让 Agent 安全操作内网数据。
 *   **本地脚本 (Local)**: 直接链接你写的 Python/Node.js 脚本，快速测试新能力。
+
+## ⚠️ 环境要求 (Prerequisites)
+
+在安装之前，请确保你的环境满足以下要求：
+
+- **操作系统**: macOS 或 Linux (Windows/WSL 支持尚处于实验阶段)。
+- **Python**: 3.9 或更高版本 (使用了 `pathlib` 的高级特性)。
+- **Node.js**: 必需，用于支持 `skills.sh` 生态及 `npx` 命令。
+- **Git**: 必需，用于从代码仓库获取技能。
 
 ## 📦 安装 (Installation)
 
@@ -65,18 +72,15 @@ git clone https://github.com/your-username/skill-manager.git ~/.agents/skills/sk
 
 ### 👤 For Humans (管理模式)
 
-**1. 安装新技能 (从社区)**
+**1. 安装新技能 (推荐统一命令)**
+脚本自动处理 Registry 名称、Git 链接及本地路径，并仅在必要时询问作用域。
 ```bash
-npx skills add browser-skill -g -y
-```
+# 推荐：支持所有来源的安装
+python3 scripts/install_skill.py <技能名或链接>
 
-**2. 安装新技能 (从 Git)**
-```bash
-# 全局安装 (默认)
-python3 scripts/install_skill.py https://github.com/user/awesome-tool.git
-
-# 项目级安装 (隔离)
-python3 scripts/install_skill.py https://github.com/user/project-tool.git --scope project
+# 示例：
+python3 scripts/install_skill.py browser-skill      # 社区技能
+python3 scripts/install_skill.py https://github... # Git 技能
 ```
 
 **3. 同步与更新**
@@ -84,7 +88,8 @@ python3 scripts/install_skill.py https://github.com/user/project-tool.git --scop
 # 交互式更新 (TUI 按需勾选)
 python3 scripts/update_skills.py
 
-# 智能更新指定技能 (自动识别该技能来源并执行相应更新)
+# 智能更新指定技能
+# 仅当该技能在全局和项目级同时存在时，才会询问作用域。
 python3 scripts/update_skills.py <技能名称>
 
 # 一键自动更新 (推荐)

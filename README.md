@@ -23,9 +23,11 @@ It centralizes **ALL** capabilities into `~/.agents/skills/` and automatically s
     *   **Global**: `~/.agents/skills/` (available to all projects).
     *   **Project**: `./.agents/skills/` (isolated to current project).
 *   **Universal Sync**: Install once, available everywhere (Claude, Gemini, Cursor, Trae, Replit, etc.).
-*   **Full TUI Experience**: Beautiful interactive interface for Installation (Scope), Update (Status check), and Uninstallation.
-*   **Smart Management**: Auto-detects updates (`npx skills update` vs `git pull`).
-
+*   **Full TUI Experience**: Beautiful interactive interface for management.
+*   **Smart Scope Detection**:
+    *   **Silent Promotion**: Automatically defaults to Global when in HOME directory (no TUI popup).
+    *   **Conflict Resolution**: Only asks for scope if the skill exists in both Global and Project repos.
+*   **Native Registry Support**: Seamlessly handles skills with `@` identifiers (e.g., `org/repo@name`).
 
 ## ⚡️ What can you manage?
 
@@ -34,6 +36,15 @@ Bring ANY tool to your agent's fingertips:
 *   **From Community (npx)**: Install `browser-skill` to let your agent search the web.
 *   **From Work (Git)**: Clone your private `internal-api-skill` for safe database access.
 *   **From Local (Path)**: Link your local scripts for development.
+
+## ⚠️ Prerequisites
+
+Before installing, ensure your environment meets these requirements:
+
+- **OS**: macOS or Linux (Windows/WSL support is experimental).
+- **Python**: 3.9 or higher (uses `pathlib` features).
+- **Node.js**: Required for the `skills.sh` ecosystem (`npx`).
+- **Git**: Required for cloning skills from repositories.
 
 ## 📦 Installation
 
@@ -50,10 +61,9 @@ git clone https://github.com/your-username/skill-manager.git ~/.agents/skills/sk
 Since this is an Agent Skill, you can just ask your agent:
 
 *   "Find a skill for reading PDF files."
-*   "Install the `browser-skill` globally."
+*   "Install the `browser-skill` (it will auto-detect context)."
 *   "List all my installed skills."
 *   "Sync my skills now."
-*   "I need a tool to manage my calendar, is there one?"
 
 ### 🤖 For Agents (The "Auto" Mode)
 
@@ -65,18 +75,15 @@ Check `SKILL.md` for detailed triggers.
 
 ### 👤 For Humans (Management)
 
-**1. Install a new Skill (from Community)**
+**1. Install a new Skill (Recommended Unified Command)**
+Handles Community Registry, Git URLs, and Local paths. It prompts for scope ONLY when necessary.
 ```bash
-npx skills add browser-skill -g -y
-```
+# Handled automatically: Registry, Git, or Local
+python3 scripts/install_skill.py <skill_name_or_url>
 
-**2. Install a new Skill (from Git)**
-```bash
-# Global Install (default)
-python3 scripts/install_skill.py https://github.com/user/awesome-tool.git
-
-# Project-Level Install (isolated)
-python3 scripts/install_skill.py https://github.com/user/project-tool.git --scope project
+# Examples:
+python3 scripts/install_skill.py browser-skill      # Community
+python3 scripts/install_skill.py https://github... # Git
 ```
 
 **3. Sync & Update**
@@ -84,7 +91,8 @@ python3 scripts/install_skill.py https://github.com/user/project-tool.git --scop
 # Interactive TUI (Select skills to update)
 python3 scripts/update_skills.py
 
-# Smart Update specified skill (Auto-detects Git pull vs npx skills update)
+# Smart Update specified skill
+# Only prompts for scope if the skill exists in both Global & Project.
 python3 scripts/update_skills.py <skill-name>
 
 # Auto-Update All
