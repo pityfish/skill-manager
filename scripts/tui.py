@@ -102,6 +102,15 @@ class MultiSelectMenu:
             # If > 20 lines, we might need scrolling but `install_skill.py` usually isn't THAT huge.
             # Let's try printing all first.
 
+            # Add help footer
+            if self.single_select:
+                footer = "\033[2m  ↑↓ move, enter confirm\033[0m"
+            else:
+                footer = "\033[2m  ↑↓ move, space select, enter confirm\033[0m"
+
+            lines_to_print.append("")
+            lines_to_print.append(footer)
+
             # Clear previous output
             if not first_draw:
                 # Move up N lines

@@ -321,7 +321,6 @@ def ask_sync_targets(available_platforms: dict, is_local: bool) -> list[str]:
     )
 
     # Instructions Footer
-    print("\033[2m  ↑↓ move, space select, enter confirm\033[0m")
 
     try:
         selected_ids = menu.run()

@@ -14,9 +14,16 @@ def get_project_root() -> Path:
         current = Path.cwd().resolve()
 
     # Check parent directories up to root
-    # Limit to reasonable depth to avoid scanning entire filesystem if lost
     for parent in [current] + list(current.parents):
+        # If we hit home directory, only count it as a project if it has the marker
+        # AND we are actually working inside a sub-item, OR if we really want Global to be distinct.
+        # Actually, the simplest fix is: if PROJECT_ROOT == HOME, we effectively don't have a "local project" context.
         if (parent / ".agents").exists() or (parent / ".git").exists():
+            # If the discovered project root is HOME, we treat it as Global context only
+            if parent == Path.home():
+                return (
+                    current  # Fallback to current, but we'll handle equivalence later
+                )
             return parent
     return current
 
@@ -425,7 +432,20 @@ def get_all_skills_with_sources(scope: str = None) -> dict:
                 }
 
     # Scan project repo
-    if (not scope or scope == "project") and SKILL_REPO_PROJECT.exists():
+    # IMPORTANT: Avoid scanning twice if Project and Global repos are physically the same
+    # This happens when operating in the HOME directory.
+    is_same_repo = False
+    if SKILL_REPO_GLOBAL.exists() and SKILL_REPO_PROJECT.exists():
+        try:
+            is_same_repo = SKILL_REPO_GLOBAL.resolve() == SKILL_REPO_PROJECT.resolve()
+        except Exception:
+            pass
+
+    if (
+        (not scope or scope == "project")
+        and SKILL_REPO_PROJECT.exists()
+        and not is_same_repo
+    ):
         for item in SKILL_REPO_PROJECT.iterdir():
             if item.is_dir() and not item.name.startswith("."):
                 source_type, source_info = get_skill_source_type(

@@ -284,7 +284,6 @@ def ask_skills_to_update(skills, selected_scope: str):
         return []
 
     menu = tui.MultiSelectMenu(title, options, sections)
-    print("\033[2m  ↑↓ move, space select, enter confirm\033[0m")
 
     try:
         selected_ids = menu.run()
