@@ -52,10 +52,14 @@ python3 scripts/sync_skill.py <skill_name>
 ```
 
 ### 5. 🆙 Update All Skills
-**Usage**: Update all installed skills (both `npx` and `git` sourced) to their latest versions.
+**Usage**: Update all installed skills to their latest versions.
 **Command**:
 ```bash
+# Interactive Mode
 python3 scripts/update_skills.py
+
+# Automated Mode (Recommended for Agents)
+python3 scripts/update_skills.py --all --npx
 ```
 
 ### 6. 🗑️ Uninstall Skill

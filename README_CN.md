@@ -79,9 +79,11 @@ python3 scripts/install_skill.py https://github.com/user/project-tool.git --scop
 ```
 
 **3. 同步与更新**
-```bash
+# 交互式更新
 python3 scripts/update_skills.py
-```
+
+# 一键自动更新 (推荐)
+python3 scripts/update_skills.py --all --npx
 
 **4. 查看 Agent 当前能做什么**
 ```bash

@@ -79,9 +79,11 @@ python3 scripts/install_skill.py https://github.com/user/project-tool.git --scop
 ```
 
 **3. Sync & Update**
-```bash
+# Interactive
 python3 scripts/update_skills.py
-```
+
+# Auto-Update All
+python3 scripts/update_skills.py --all --npx
 
 **4. Check what your Agent can do**
 ```bash
