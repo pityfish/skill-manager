@@ -19,8 +19,10 @@
 
 ## 🚀 核心价值
 
-*   **统一归集**: 无论来源是 npm 还是 git，所有技能都住在同一个家 (`~/.agents/skills/`)。
-*   **一次安装，处处可用**: 自动检测并同步到 Antigravity, Claude, Gemini, Cursor 等所有平台。
+*   **统一归集**: 无论来源是 npm 还是 git，所有技能都住在同一个家。
+    *   **全局 (Global)**: `~/.agents/skills/` (所有项目共用)
+    *   **项目 (Project)**: `./.agents/skills/` (仅限当前项目)
+*   **一次安装，处处可用**: 自动同步到 Claude, Gemini, Cursor, Trae, Replit 等所有平台。
 *   **智能维护**: 自动区分技能来源，提供正确的更新方式 (`npx` vs `git`)。
 
 
@@ -69,7 +71,11 @@ npx skills add browser-skill -g -y
 
 **2. 安装新技能 (从 Git)**
 ```bash
+# 全局安装 (默认)
 python3 scripts/install_skill.py https://github.com/user/awesome-tool.git
+
+# 项目级安装 (隔离)
+python3 scripts/install_skill.py https://github.com/user/project-tool.git --scope project
 ```
 
 **3. 同步与更新**
@@ -84,14 +90,47 @@ python3 scripts/list_synced.py
 
 ## 🔌 支持的智能体
 
-| 智能体 | 状态 | 路径 |
+| Platform | Global Path | Project Path |
 | :--- | :--- | :--- |
-| **Claude Code** | ✅ 自动同步 | `~/.claude/skills` |
-| **Google Antigravity** | ✅ 自动同步 | `~/.gemini/antigravity/skills` |
-| **Gemini CLI** | ✅ 自动同步 | `~/.gemini/skills` |
-| **Cursor** | ✅ 自动同步 | `~/.cursor/skills` |
-| **GitHub Copilot** | ✅ 自动同步 | `~/.copilot/skills` |
-| **OpenAI Codex** | ✅ 自动同步 | `~/.codex/skills` |
+| **AdaL** | `~/.adal/skills` | `.adal/skills` |
+| **Amp** | `~/.config/agents/skills` | `.agents/skills` |
+| **Antigravity** | `~/.gemini/antigravity/skills` | `.agent/skills` |
+| **Augment** | `~/.augment/skills` | `.augment/skills` |
+| **Claude Code** | `~/.claude/skills` | `.claude/skills` |
+| **Cline** | `~/.cline/skills` | `.cline/skills` |
+| **CodeBuddy** | `~/.codebuddy/skills` | `.codebuddy/skills` |
+| **Codex** | `~/.codex/skills` | `.agents/skills` |
+| **Command Code** | `~/.commandcode/skills` | `.commandcode/skills` |
+| **Continue** | `~/.continue/skills` | `.continue/skills` |
+| **Crush** | `~/.config/crush/skills` | `.crush/skills` |
+| **Cursor** | `~/.cursor/skills` | `.cursor/skills` |
+| **Droid** | `~/.factory/skills` | `.factory/skills` |
+| **Gemini CLI** | `~/.gemini/skills` | `.agents/skills` |
+| **GitHub Copilot** | `~/.copilot/skills` | `.agents/skills` |
+| **Goose** | `~/.config/goose/skills` | `.goose/skills` |
+| **Junie** | `~/.junie/skills` | `.junie/skills` |
+| **Kilo Code** | `~/.kilocode/skills` | `.kilocode/skills` |
+| **Kimi Code CLI** | `~/.config/agents/skills` | `.agents/skills` |
+| **Kiro CLI** | `~/.kiro/skills` | `.kiro/skills` |
+| **Kode** | `~/.kode/skills` | `.kode/skills` |
+| **MCPJam** | `~/.mcpjam/skills` | `.mcpjam/skills` |
+| **Mistral Vibe** | `~/.vibe/skills` | `.vibe/skills` |
+| **Mux** | `~/.mux/skills` | `.mux/skills` |
+| **Neovate** | `~/.neovate/skills` | `.neovate/skills` |
+| **OpenClaw** | `~/.moltbot/skills` | `skills` |
+| **OpenCode** | `~/.config/opencode/skills` | `.agents/skills` |
+| **OpenHands** | `~/.openhands/skills` | `.openhands/skills` |
+| **Pi** | `~/.pi/agent/skills` | `.pi/skills` |
+| **Pochi** | `~/.pochi/skills` | `.pochi/skills` |
+| **Qoder** | `~/.qoder/skills` | `.qoder/skills` |
+| **Qwen Code** | `~/.qwen/skills` | `.qwen/skills` |
+| **Replit** | `~/.config/agents/skills` | `.agents/skills` |
+| **Roo Code** | `~/.roo/skills` | `.roo/skills` |
+| **Trae** | `~/.trae/skills` | `.trae/skills` |
+| **Trae CN** | `~/.trae-cn/skills` | `.trae/skills` |
+| **Windsurf** | `~/.codeium/windsurf/skills` | `.windsurf/skills` |
+| **Zencoder** | `~/.zencoder/skills` | `.zencoder/skills` |
+| **iFlow CLI** | `~/.iflow/skills` | `.iflow/skills` |
 
 ## ❓ 常见问题
 

@@ -69,13 +69,13 @@ def unzip_skill_file(skill_file: Path, target_dir: Path) -> Path:
     return extract_path
 
 
-def get_platform_paths(is_local_install: bool) -> dict:
+def get_platform_paths(scope: str) -> dict:
     """
     Get available platforms with appropriate paths.
-    If is_local_install is True, returns paths relative to CWD.
-    If False, returns global system paths.
+    If scope is 'project', returns paths relative to CWD.
+    If 'global', returns global system paths.
     """
-    if not is_local_install:
+    if scope == "global":
         return config.get_available_platforms()
 
     # improved local install scanning
@@ -104,13 +104,16 @@ def get_platform_paths(is_local_install: bool) -> dict:
     return available
 
 
-def check_conflicts(skill_name: str, available_platforms: dict) -> dict:
+def check_conflicts(
+    skill_name: str, available_platforms: dict, scope: str = "global"
+) -> dict:
     """Check if skill already exists in repo or platforms (as non-symlink)."""
     conflicts = {}
+    repo_path = config.get_skill_repo(scope)
 
     # Check repo
-    if (config.SKILL_REPO / skill_name).exists():
-        conflicts["repo"] = config.SKILL_REPO / skill_name
+    if (repo_path / skill_name).exists():
+        conflicts["repo"] = repo_path / skill_name
 
     # Check available platforms for conflicts
     for p_id, info in available_platforms.items():
@@ -119,7 +122,7 @@ def check_conflicts(skill_name: str, available_platforms: dict) -> dict:
             # If it's a symlink pointing to our repo, it's not a conflict, it's just an update
             if (
                 target.is_symlink()
-                and target.resolve() == (config.SKILL_REPO / skill_name).resolve()
+                and target.resolve() == (repo_path / skill_name).resolve()
             ):
                 continue
             conflicts[info["name"]] = target
@@ -141,13 +144,18 @@ def ask_user_overwrite(conflicts: dict) -> bool:
 
 
 def install_to_repo(
-    source_path: Path, skill_name: str, force: bool = False, is_git: bool = False
+    source_path: Path,
+    skill_name: str,
+    scope: str = "global",
+    force: bool = False,
+    is_git: bool = False,
 ) -> Path:
-    """Install skill to Central Skill Repo."""
-    target_path = config.SKILL_REPO / skill_name
+    """Install skill to correct Skill Repo (Global or Project)."""
+    repo_path = config.get_skill_repo(scope)
+    target_path = repo_path / skill_name
 
     # Create repo directory if it doesn't exist
-    config.SKILL_REPO.mkdir(parents=True, exist_ok=True)
+    repo_path.mkdir(parents=True, exist_ok=True)
 
     # Remove existing if force
     if target_path.exists() and force:
@@ -167,7 +175,7 @@ def install_to_repo(
 
     if source_path.is_file() and source_path.suffix == ".skill":
         # Unzip .skill file
-        return unzip_skill_file(source_path, config.SKILL_REPO)
+        return unzip_skill_file(source_path, repo_path)
     else:
         # Copy directory
         # If source is same as target (re-installing from repo), skip copy
@@ -263,11 +271,13 @@ def update_sync_metadata(
     skill_name: str,
     selected_ids: list[str],
     available_platforms: dict,
+    scope: str = "global",
     source_type: str = "unknown",
     source_url: Optional[str] = None,
 ):
     """Update metadata file with sync information."""
-    metadata = config.load_metadata()
+    metadata = config.load_metadata(scope)
+    repo_path = config.get_skill_repo(scope)
 
     # We need to preserve global targets if we are installing local, and vice versa
     # Actually, simplistic approach: just append to the list of targets if not present.
@@ -289,12 +299,12 @@ def update_sync_metadata(
             valid_targets.append(t)
 
     metadata[skill_name] = {
-        "source": str(config.SKILL_REPO / skill_name),
+        "source": str(repo_path / skill_name),
         "source_type": source_type,
         "source_url": source_url,
         "targets": valid_targets,
     }
-    config.save_metadata(metadata)
+    config.save_metadata(metadata, scope)
 
 
 def main():
@@ -305,12 +315,26 @@ def main():
         "skill_path", help="Path to local skill, .skill file, or Git URL"
     )
     parser.add_argument(
+        "--scope",
+        choices=["global", "project"],
+        default="global",
+        help="Installation scope: 'global' (default) or 'project'",
+    )
+    parser.add_argument(
         "--local",
         action="store_true",
-        help="Install to current project's local config directories instead of global system directores",
+        help="Deprecated alias for --scope project",
     )
 
     args = parser.parse_args()
+
+    # Handle deprecated --local flag
+    if args.local:
+        if args.scope != "global":
+            print(
+                "⚠️  Warning: Both --local and --scope provided. Using --local (project scope)."
+            )
+        args.scope = "project"
 
     source_input = args.skill_path
     is_git = False
@@ -340,14 +364,15 @@ def main():
             print(f"   Source: {source_path}")
 
         # Determine target platforms (Global vs Local)
-        available_platforms = get_platform_paths(args.local)
+        available_platforms = get_platform_paths(args.scope)
+        repo_path_root = config.get_skill_repo(args.scope)
 
         # Check for conflicts
-        conflicts = check_conflicts(skill_name, available_platforms)
+        conflicts = check_conflicts(skill_name, available_platforms, args.scope)
         force = False
 
         # Filter out self-conflicts if reinstalling from repo
-        if not is_git and source_path == config.SKILL_REPO / skill_name:
+        if not is_git and source_path == repo_path_root / skill_name:
             conflicts.pop("repo", None)
 
         if conflicts:
@@ -357,12 +382,14 @@ def main():
             force = True
 
         # Install to Central Repo
-        print(f"\n📥 Installing to Central Repo (~/.skill_repo)...")
-        repo_path = install_to_repo(source_path, skill_name, force, is_git)
+        print(f"\n📥 Installing to '{args.scope}' Repo ({repo_path_root})...")
+        repo_path = install_to_repo(
+            source_path, skill_name, scope=args.scope, force=force, is_git=is_git
+        )
         print(f"   ✅ Stored at: {repo_path}")
 
         # Ask user which platforms to sync
-        sync_targets = ask_sync_targets(available_platforms, args.local)
+        sync_targets = ask_sync_targets(available_platforms, args.scope == "project")
 
         # Sync to platforms
         sync_to_platforms(
@@ -372,7 +399,12 @@ def main():
         # Update metadata
         source_type = config.SOURCE_TYPE_GIT if is_git else config.SOURCE_TYPE_LOCAL
         update_sync_metadata(
-            skill_name, sync_targets, available_platforms, source_type, source_input
+            skill_name,
+            sync_targets,
+            available_platforms,
+            scope=args.scope,
+            source_type=source_type,
+            source_url=source_input,
         )
 
         print(f"\n✅ Skill '{skill_name}' setup complete!")

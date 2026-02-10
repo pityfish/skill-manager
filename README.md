@@ -19,8 +19,10 @@ It centralizes **ALL** capabilities into `~/.agents/skills/` and automatically s
 
 ## 🚀 Key Value
 
-*   **Unified Home**: No more scattered tools. Whether it's from `npm` or `git`, it lives in `~/.agents/skills/`.
-*   **Universal Sync**: Install once, available everywhere (Claude, Gemini, Antigravity, Cursor).
+*   **Unified Home**: No more scattered tools.
+    *   **Global**: `~/.agents/skills/` (available to all projects).
+    *   **Project**: `./.agents/skills/` (isolated to current project).
+*   **Universal Sync**: Install once, available everywhere (Claude, Gemini, Cursor, Trae, Replit, etc.).
 *   **Smart Management**: Auto-detects updates (`npx skills update` vs `git pull`).
 
 
@@ -69,7 +71,11 @@ npx skills add browser-skill -g -y
 
 **2. Install a new Skill (from Git)**
 ```bash
+# Global Install (default)
 python3 scripts/install_skill.py https://github.com/user/awesome-tool.git
+
+# Project-Level Install (isolated)
+python3 scripts/install_skill.py https://github.com/user/project-tool.git --scope project
 ```
 
 **3. Sync & Update**
@@ -84,14 +90,47 @@ python3 scripts/list_synced.py
 
 ## 🔌 Supported Agents
 
-| Agent | Status | Path |
+| Platform | Global Path | Project Path |
 | :--- | :--- | :--- |
-| **Claude Code** | ✅ Auto-Sync | `~/.claude/skills` |
-| **Google Antigravity** | ✅ Auto-Sync | `~/.gemini/antigravity/skills` |
-| **Gemini CLI** | ✅ Auto-Sync | `~/.gemini/skills` |
-| **Cursor** | ✅ Auto-Sync | `~/.cursor/skills` |
-| **GitHub Copilot** | ✅ Auto-Sync | `~/.copilot/skills` |
-| **OpenAI Codex** | ✅ Auto-Sync | `~/.codex/skills` |
+| **AdaL** | `~/.adal/skills` | `.adal/skills` |
+| **Amp** | `~/.config/agents/skills` | `.agents/skills` |
+| **Antigravity** | `~/.gemini/antigravity/skills` | `.agent/skills` |
+| **Augment** | `~/.augment/skills` | `.augment/skills` |
+| **Claude Code** | `~/.claude/skills` | `.claude/skills` |
+| **Cline** | `~/.cline/skills` | `.cline/skills` |
+| **CodeBuddy** | `~/.codebuddy/skills` | `.codebuddy/skills` |
+| **Codex** | `~/.codex/skills` | `.agents/skills` |
+| **Command Code** | `~/.commandcode/skills` | `.commandcode/skills` |
+| **Continue** | `~/.continue/skills` | `.continue/skills` |
+| **Crush** | `~/.config/crush/skills` | `.crush/skills` |
+| **Cursor** | `~/.cursor/skills` | `.cursor/skills` |
+| **Droid** | `~/.factory/skills` | `.factory/skills` |
+| **Gemini CLI** | `~/.gemini/skills` | `.agents/skills` |
+| **GitHub Copilot** | `~/.copilot/skills` | `.agents/skills` |
+| **Goose** | `~/.config/goose/skills` | `.goose/skills` |
+| **Junie** | `~/.junie/skills` | `.junie/skills` |
+| **Kilo Code** | `~/.kilocode/skills` | `.kilocode/skills` |
+| **Kimi Code CLI** | `~/.config/agents/skills` | `.agents/skills` |
+| **Kiro CLI** | `~/.kiro/skills` | `.kiro/skills` |
+| **Kode** | `~/.kode/skills` | `.kode/skills` |
+| **MCPJam** | `~/.mcpjam/skills` | `.mcpjam/skills` |
+| **Mistral Vibe** | `~/.vibe/skills` | `.vibe/skills` |
+| **Mux** | `~/.mux/skills` | `.mux/skills` |
+| **Neovate** | `~/.neovate/skills` | `.neovate/skills` |
+| **OpenClaw** | `~/.moltbot/skills` | `skills` |
+| **OpenCode** | `~/.config/opencode/skills` | `.agents/skills` |
+| **OpenHands** | `~/.openhands/skills` | `.openhands/skills` |
+| **Pi** | `~/.pi/agent/skills` | `.pi/skills` |
+| **Pochi** | `~/.pochi/skills` | `.pochi/skills` |
+| **Qoder** | `~/.qoder/skills` | `.qoder/skills` |
+| **Qwen Code** | `~/.qwen/skills` | `.qwen/skills` |
+| **Replit** | `~/.config/agents/skills` | `.agents/skills` |
+| **Roo Code** | `~/.roo/skills` | `.roo/skills` |
+| **Trae** | `~/.trae/skills` | `.trae/skills` |
+| **Trae CN** | `~/.trae-cn/skills` | `.trae/skills` |
+| **Windsurf** | `~/.codeium/windsurf/skills` | `.windsurf/skills` |
+| **Zencoder** | `~/.zencoder/skills` | `.zencoder/skills` |
+| **iFlow CLI** | `~/.iflow/skills` | `.iflow/skills` |
 
 ## ❓ Troubleshooting
 

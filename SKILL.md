@@ -36,26 +36,32 @@ npx skills add <owner/pkg> -g -y
 ```
 
 #### Plan B: Install from Git / Local
-If it is a GitHub URL or a local path:
-```bash
-python3 scripts/install_skill.py <URL_or_Path>
-```
+- **Global Install** (default, for generic tools):
+  ```bash
+  python3 scripts/install_skill.py <URL_or_Path>
+  # or explicitly
+  python3 scripts/install_skill.py <URL_or_Path> --scope global
+  ```
+- **Project Install** (for project-specific tools):
+  ```bash
+  python3 scripts/install_skill.py <URL_or_Path> --scope project
+  ```
 
 ### 3. 📋 List Installed Skills
-See what tools are available and their **Sync Status**:
+See what tools are available and their **Sync Status** (supports Global and Project scopes):
 ```bash
 python3 scripts/list_synced.py
 ```
 
 ### 4. 🗑️ Uninstall Skills
-Unified uninstallation entry point (handles both npx and git installs, cleans up symlinks across all platforms):
+Unified uninstallation entry point (handles both npx and git installs, cleans up symlinks across all platforms, supports Global/Project selection):
 ```bash
 python3 scripts/uninstall_skill.py <skill-name>
 ```
 
 ### 5. 🔄 Update/Sync Skills
 ```bash
-# Interactive update menu
+# Interactive update menu for both Global and Project skills
 python3 scripts/update_skills.py
 ```
 
@@ -70,8 +76,8 @@ python3 scripts/update_skills.py
 -   **npx skills**: Installed in `~/.agents/skills/` (Global)
 -   **Git skills**: Cloned to `~/.agents/skills/` and symlinked to platforms
 -   **Platform Sync Paths**:
-    -   Antigravity: `~/.gemini/antigravity/skills`
-    -   Claude: `~/.claude/skills`
-    -   Others: `~/.gemini/skills`, `~/.cursor/skills`, etc.
+    -   **Global**: `~/.agents/skills/`
+    -   **Project**: `./.agents/skills/`
+    -   **Supported Platforms**: Claude Code, Antigravity, Gemini CLI, Cursor, GitHub Copilot, OpenAI Codex, Amp, Kimi Code CLI, Replit, Augment, OpenClaw, Cline, CodeBuddy, Command Code, Continue, Crush, Droid, Goose, Junie, iFlow, Kilo, Kiro, Kode, MCPJam, Mistral Vibe, Mux, OpenCode, OpenHands, Pi, Qoder, Qwen, Roo Code, Trae, Windsurf, Zencoder, Neovate, Pochi, AdaL...
 
 This tool automatically handles all path mappings. You only need to focus on the commands in `scripts/`.

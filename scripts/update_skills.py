@@ -137,16 +137,19 @@ def update_npx_skill(skill_name: str) -> str:
 
 def get_all_updatable_skills():
     """
-    Return a list of (skill_name, path, source_type, source_info) for all updatable skills.
+    Return a list of (skill_name, path, source_type, source_info, scope) for all updatable skills.
     """
     skills = []
-    if not config.SKILL_REPO.exists():
-        return []
 
-    for item in sorted(config.SKILL_REPO.iterdir()):
-        if item.is_dir() and not item.name.startswith("."):
-            source_type, source_info = config.get_skill_source_type(item.name)
-            skills.append((item.name, item, source_type, source_info))
+    skills_with_sources = config.get_all_skills_with_sources()
+
+    for name, info in sorted(skills_with_sources.items()):
+        path = info["path"]
+        source_type = info.get("source_type", config.SOURCE_TYPE_UNKNOWN)
+        source_info = info.get("source_info", {})
+        scope = info.get("scope", "unknown")
+
+        skills.append((name, path, source_type, source_info, scope))
 
     return skills
 
@@ -166,11 +169,11 @@ def ask_skills_to_update(skills):
     # Run git checks in parallel for git-based skills
     git_futures = {}
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        for name, path, source_type, source_info in skills:
+        for name, path, source_type, source_info, scope in skills:
             if source_type == config.SOURCE_TYPE_GIT or (path / ".git").exists():
                 git_futures[name] = executor.submit(check_updates_available, path)
 
-    for name, path, source_type, source_info in skills:
+    for name, path, source_type, source_info, scope in skills:
         status_msg = ""
         has_update = False
 
@@ -183,7 +186,8 @@ def ask_skills_to_update(skills):
         else:
             status_msg = "Unknown source"
 
-        entry = (name, path, source_type, source_info, has_update, status_msg)
+        # Add scope info to entry
+        entry = (name, path, source_type, source_info, has_update, status_msg, scope)
 
         if source_type == config.SOURCE_TYPE_NPX:
             npx_skills.append(entry)
@@ -198,17 +202,41 @@ def ask_skills_to_update(skills):
     all_options = []
     idx = 1
 
+    def get_scope_badge(scope):
+        if scope == "global":
+            return "[Global]"
+        if scope == "project":
+            return "[Project]"
+        return ""
+
     if git_skills:
         print(f"\n   🔗 Git-based skills (updatable with git pull):")
-        for name, path, source_type, source_info, has_update, status_msg in git_skills:
+        for (
+            name,
+            path,
+            source_type,
+            source_info,
+            has_update,
+            status_msg,
+            scope,
+        ) in git_skills:
             marker = "* " if has_update else "  "
-            print(f"   {idx}. {marker}{name:25} [{status_msg}]")
+            badge = get_scope_badge(scope)
+            print(f"   {idx}. {marker}{name:25} {badge} [{status_msg}]")
             all_options.append((name, path, source_type, "git"))
             idx += 1
 
     if npx_skills:
         print(f"\n   📦 npx skills (use 'npx skills update' to update):")
-        for name, path, source_type, source_info, has_update, status_msg in npx_skills:
+        for (
+            name,
+            path,
+            source_type,
+            source_info,
+            has_update,
+            status_msg,
+            scope,
+        ) in npx_skills:
             source_repo = source_info.get("source", "") if source_info else ""
             print(f"   {idx}. {name:25} [{source_repo}]")
             all_options.append((name, path, source_type, "npx"))
@@ -216,15 +244,33 @@ def ask_skills_to_update(skills):
 
     if local_skills:
         print(f"\n   📁 Local skills (manual update required):")
-        for name, path, source_type, source_info, has_update, status_msg in local_skills:
-            print(f"   {idx}. {name:25} [Local directory]")
+        for (
+            name,
+            path,
+            source_type,
+            source_info,
+            has_update,
+            status_msg,
+            scope,
+        ) in local_skills:
+            badge = get_scope_badge(scope)
+            print(f"   {idx}. {name:25} {badge} [Local directory]")
             all_options.append((name, path, source_type, "local"))
             idx += 1
 
     if unknown_skills:
         print(f"\n   ❓ Unknown source:")
-        for name, path, source_type, source_info, has_update, status_msg in unknown_skills:
-            print(f"   {idx}. {name:25} [Unknown]")
+        for (
+            name,
+            path,
+            source_type,
+            source_info,
+            has_update,
+            status_msg,
+            scope,
+        ) in unknown_skills:
+            badge = get_scope_badge(scope)
+            print(f"   {idx}. {name:25} {badge} [Unknown]")
             all_options.append((name, path, source_type, "unknown"))
             idx += 1
 
@@ -242,7 +288,11 @@ def ask_skills_to_update(skills):
 
     # Handle special cases
     if choice.lower() == "a" or "all" in choice.lower():
-        return [(name, path, st, method) for name, path, st, method in all_options if method == "git"]
+        return [
+            (name, path, st, method)
+            for name, path, st, method in all_options
+            if method == "git"
+        ]
 
     if choice.lower() == "n":
         return [("__npx_update__", None, config.SOURCE_TYPE_NPX, "npx")]
@@ -273,20 +323,21 @@ def ask_skills_to_update(skills):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Update skills based on installation source.")
+    parser = argparse.ArgumentParser(
+        description="Update skills based on installation source."
+    )
     parser.add_argument("skills", nargs="*", help="Specific skill names to update")
     parser.add_argument(
-        "--all", action="store_true", help="Update all Git-based skills without prompting"
+        "--all",
+        action="store_true",
+        help="Update all Git-based skills without prompting",
     )
     parser.add_argument(
-        "--npx", action="store_true", help="Run 'npx skills update' for npx-installed skills"
+        "--npx",
+        action="store_true",
+        help="Run 'npx skills update' for npx-installed skills",
     )
     args = parser.parse_args()
-
-    skill_repo = config.SKILL_REPO
-    if not skill_repo.exists():
-        print(f"❌ Skill repository not found at {skill_repo}")
-        return
 
     targets = []
 
@@ -302,15 +353,18 @@ def main():
             print("\n❌ npx not found. Please install Node.js first.")
         return
 
+    all_skills_map = config.get_all_skills_with_sources()
+
     # 1. Update specific skills from args
     if args.skills:
         for name in args.skills:
-            path = skill_repo / name
-            if not path.exists():
+            if name not in all_skills_map:
                 print(f"❌ Skill '{name}' not found.")
                 continue
 
-            source_type, source_info = config.get_skill_source_type(name)
+            info = all_skills_map[name]
+            path = info["path"]
+            source_type = info.get("source_type")
 
             if source_type == config.SOURCE_TYPE_NPX:
                 print(f"📦 Skill '{name}' was installed via npx skills.")
@@ -329,7 +383,7 @@ def main():
     # 2. Update all Git-based if --all flag
     elif args.all:
         all_skills = get_all_updatable_skills()
-        for name, path, source_type, source_info in all_skills:
+        for name, path, source_type, source_info, scope in all_skills:
             if source_type == config.SOURCE_TYPE_GIT or (path / ".git").exists():
                 targets.append((name, path, source_type, "git"))
 
