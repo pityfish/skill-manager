@@ -31,11 +31,11 @@ def remove_path(path: Path) -> bool:
     return False
 
 
-def get_skill_locations(skill_name: str, available_platforms: dict) -> dict:
-    """Get all locations where skill exists."""
+def get_skill_locations(skill_name: str) -> dict:
+    """Get all locations where skill exists (Global & Project)."""
     locations = {}
 
-    # Check Global Repo
+    # 1. Global Repo
     global_repo = config.SKILL_REPO_GLOBAL / skill_name
     if global_repo.exists() or global_repo.is_symlink():
         locations["global_repo"] = {
@@ -46,7 +46,7 @@ def get_skill_locations(skill_name: str, available_platforms: dict) -> dict:
             "scope": "global",
         }
 
-    # Check Project Repo
+    # 2. Project Repo
     project_repo = config.SKILL_REPO_PROJECT / skill_name
     if project_repo.exists() or project_repo.is_symlink():
         locations["project_repo"] = {
@@ -57,23 +57,42 @@ def get_skill_locations(skill_name: str, available_platforms: dict) -> dict:
             "scope": "project",
         }
 
-    # Check all available platforms
-    for p_id, info in available_platforms.items():
+    # 3. Global Platforms
+    global_platforms = config.get_available_platforms()
+    for p_id, info in global_platforms.items():
         path = info["path"] / skill_name
         if path.exists() or path.is_symlink():
             is_symlink = path.is_symlink()
-            locations[p_id] = {
-                "name": info["name"],
+            locations[f"global_{p_id}"] = {
+                "name": f"Global {info['name']}",
                 "path": path,
                 "is_symlink": is_symlink,
                 "target": path.resolve() if is_symlink else None,
+                "scope": "global",
+                "platform_id": p_id,
+            }
+
+    # 4. Project Platforms
+    # Check manual project locations based on supported platforms
+    for name, conf in config.SUPPORTED_PLATFORMS.items():
+        # Check if parent config exists to be considered "available" or if the skill just exists there
+        local_path = config.PROJECT_ROOT / conf["local"] / skill_name
+        if local_path.exists() or local_path.is_symlink():
+            is_symlink = local_path.is_symlink()
+            locations[f"project_{conf['id']}"] = {
+                "name": f"Project {name}",
+                "path": local_path,
+                "is_symlink": is_symlink,
+                "target": local_path.resolve() if is_symlink else None,
+                "scope": "project",
+                "platform_id": conf["id"],
             }
 
     return locations
 
 
 def get_synced_symlinks(skill_name: str, locations: dict) -> list[str]:
-    """Get list of platform IDs that are symlinks pointing to a repo."""
+    """Get list of location keys that are symlinks pointing to a repo."""
     synced = []
     repo_paths = []
 
@@ -82,12 +101,12 @@ def get_synced_symlinks(skill_name: str, locations: dict) -> list[str]:
     if "project_repo" in locations:
         repo_paths.append(locations["project_repo"]["path"].resolve())
 
-    for p_id, info in locations.items():
-        if "repo" in p_id:
+    for key, info in locations.items():
+        if "repo" in key:
             continue
 
         if info["is_symlink"] and info["target"] in repo_paths:
-            synced.append(p_id)
+            synced.append(key)
 
     return synced
 
@@ -104,7 +123,7 @@ def cleanup_metadata(skill_name: str):
         if not repo_path.exists():
             del metadata[skill_name]
             config.save_metadata(metadata, scope)
-            print(f"   ✅ Removed from {scope} metadata")
+            # print(f"   ✅ Removed from {scope} metadata")
             continue
 
         # Check targets
@@ -118,73 +137,21 @@ def cleanup_metadata(skill_name: str):
         if len(valid_targets) != len(current_targets):
             metadata[skill_name]["targets"] = valid_targets
             config.save_metadata(metadata, scope)
-            print(f"   ✅ Updated {scope} metadata")
-
-
-def uninstall_npx_skill(skill_name: str) -> bool:
-    """Uninstall a skill using npx skills remove -g (global)."""
-    try:
-        print(f"\n📦 Running 'npx skills remove -g {skill_name} -y'...\n")
-        subprocess.run(
-            ["npx", "skills", "remove", "-g", skill_name, "-y"],
-            check=True,
-        )
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"❌ npx skills remove failed: {e}")
-        return False
-    except FileNotFoundError:
-        print("❌ npx not found. Please install Node.js first.")
-        return False
-
-
-def uninstall_skill_complete(skill_name: str, locations: dict):
-    """
-    Uninstall skill completely - remove from central repo and all synced platforms.
-    """
-    print(f"\n🗑️  Removing '{skill_name}' completely...\n")
-
-    removed_count = 0
-
-    # First remove all synced symlinks and platforms
-    for p_id, info in locations.items():
-        if "repo" in p_id:
-            continue  # Handle repos last
-
-        path = info["path"]
-        if remove_path(path):
-            print(f"   ✅ Removed from {info['name']}: {path}")
-            removed_count += 1
-
-    # Then remove from repos
-    for repo_key in ["global_repo", "project_repo"]:
-        if repo_key in locations:
-            repo_info = locations[repo_key]
-            if remove_path(repo_info["path"]):
-                print(f"   ✅ Removed from {repo_info['name']}: {repo_info['path']}")
-                removed_count += 1
-
-    # Clean up metadata
-    cleanup_metadata(skill_name)
-
-    if removed_count > 0:
-        print(f"\n✅ Uninstall complete! Removed from {removed_count} location(s).")
-    else:
-        print(f"\n⚠️  Nothing was removed.")
+            # print(f"   ✅ Updated {scope} metadata")
 
 
 def uninstall_skill_selective(
-    skill_name: str, selected_ids: list[str], locations: dict
+    skill_name: str, selected_keys: list[str], locations: dict
 ):
     """Uninstall skill from selected locations only."""
     print(f"\n🗑️  Removing '{skill_name}'...\n")
 
     removed_any = False
 
-    for p_id in selected_ids:
-        if p_id not in locations:
+    for key in selected_keys:
+        if key not in locations:
             continue
-        info = locations[p_id]
+        info = locations[key]
         path = info["path"]
 
         if remove_path(path):
@@ -209,148 +176,130 @@ def main():
 
     skill_name = sys.argv[1]
 
-    # Get skill source type (check both scopes)
-    source_type, source_info = config.get_skill_source_type(skill_name, scope="global")
-    if source_type == config.SOURCE_TYPE_UNKNOWN:
-        source_type, source_info = config.get_skill_source_type(
-            skill_name, scope="project"
-        )
-
-    source_icon = config.get_source_type_icon(source_type)
-    source_label = config.get_source_type_label(source_type)
-
-    # Get available platforms (to check for skill existence)
-    available_platforms = config.get_available_platforms()
-
     # Find where skill exists
-    locations = get_skill_locations(skill_name, available_platforms)
+    locations = get_skill_locations(skill_name)
 
     if not locations:
-        print(f"❌ Skill '{skill_name}' not found in any location.")
+        print(f"❌ Skill '{skill_name}' not found in any location (Global or Project).")
         sys.exit(1)
 
     # Count synced symlinks
     synced_symlinks = get_synced_symlinks(skill_name, locations)
 
-    print(f"\n{source_icon} Skill '{skill_name}' [{source_label}]")
-    print(f"\n📍 Found in {len(locations)} location(s):")
-    for p_id, info in locations.items():
+    # Detect active scopes
+    has_global = any(l["scope"] == "global" for l in locations.values())
+    has_project = any(l["scope"] == "project" for l in locations.values())
+
+    # Determine default scope based on Context
+    # If we are effectively in a project (config.PROJECT_ROOT has .agents or .git), prefer project
+    is_in_project = (config.PROJECT_ROOT / ".agents").exists() or (
+        config.PROJECT_ROOT / ".git"
+    ).exists()
+
+    default_scope = "project" if (is_in_project and has_project) else "global"
+    if default_scope == "global" and not has_global and has_project:
+        default_scope = "project"
+
+    print(f"\n📦 Skill '{skill_name}' found in:")
+
+    for key, info in locations.items():
         type_str = "symlink" if info["is_symlink"] else "directory"
-        target_info = f" → {info['target']}" if info["is_symlink"] else ""
-        synced_mark = " (synced)" if p_id in synced_symlinks else ""
+        synced_mark = " (synced)" if key in synced_symlinks else ""
+        scope_icon = "🌍" if info["scope"] == "global" else "🏠"
         print(
-            f"   - {info['name']}: {info['path']} [{type_str}{target_info}]{synced_mark}"
+            f"   {scope_icon} {info['name']}: {info['path']} [{type_str}]{synced_mark}"
         )
 
-    # Show source info for npx skills
-    if source_type == config.SOURCE_TYPE_NPX and source_info:
-        source_repo = source_info.get("source", "")
-        if source_repo:
-            print(f"\n   Source: {source_repo}")
+    # Check source type for npx warning
+    # We check global first, then project
+    source_type, _ = config.get_skill_source_type(skill_name, scope="global")
+    if source_type == config.SOURCE_TYPE_UNKNOWN:
+        source_type, _ = config.get_skill_source_type(skill_name, scope="project")
 
-    # Handle npx skills differently
     if source_type == config.SOURCE_TYPE_NPX:
         print(f"\n⚠️  This skill was installed via 'npx skills'.")
         print(f"   Recommended: Use 'npx skills remove -g {skill_name}' to uninstall.")
 
-        choice = input(
-            "\nHow do you want to proceed?\n"
-            "   1. Use 'npx skills remove -g' (recommended)\n"
-            "   2. Remove files manually\n"
-            "   3. Cancel\n"
-            "\nEnter choice [1]: "
-        ).strip()
-
-        if not choice or choice == "1":
-            if uninstall_npx_skill(skill_name):
-                print(f"\n✅ Skill '{skill_name}' uninstalled via npx skills.")
-            sys.exit(0)
-        elif choice == "3":
-            print("\n❌ Uninstall cancelled.")
-            sys.exit(0)
-        # choice == "2" falls through to manual removal
-
-    # For Git/Local skills, show simplified options
-    repo_count = 0
-    if "global_repo" in locations:
-        repo_count += 1
-    if "project_repo" in locations:
-        repo_count += 1
-
     print("\n🗑️  Uninstall options:")
-    print(
-        f"   1. Complete uninstall ({repo_count} repos + {len(synced_symlinks)} synced platforms)"
-    )
 
-    # Only show selective option if there are non-synced locations or multiple repos
-    non_synced = [
-        p_id
-        for p_id in locations.keys()
-        if "repo" not in p_id and p_id not in synced_symlinks
-    ]
+    options = []
 
-    # Always allow selective if we have locations
-    print(f"   2. Selective removal (choose specific locations)")
-    print(f"   3. Cancel")
+    # Option 1: Context-aware default
+    if default_scope == "project":
+        options.append(("uninstall_project", f"Remove from Project only (Recommended)"))
+    elif default_scope == "global" and has_global:
+        options.append(("uninstall_global", f"Remove from Global only"))
 
-    choice = input(f"\nEnter choice [1]: ").strip()
+    # Option 2: The other scope if available
+    if default_scope == "project" and has_global:
+        options.append(("uninstall_global", "Remove from Global only"))
+    elif default_scope == "global" and has_project:
+        options.append(("uninstall_project", "Remove from Project only"))
 
-    if not choice or choice == "1":
-        # Confirm complete uninstall
-        print(f"\n⚠️  This will remove the skill from:")
-        if "global_repo" in locations:
-            print(f"   - Global Repo ({locations['global_repo']['path']})")
-        if "project_repo" in locations:
-            print(f"   - Project Repo ({locations['project_repo']['path']})")
+    # Option 3: All
+    if has_global and has_project:
+        options.append(("uninstall_all", "Remove Everywhere (Global + Project)"))
 
-        for p_id in synced_symlinks:
-            print(f"   - {locations[p_id]['name']} ({locations[p_id]['path']})")
+    # Option 4: Selective
+    options.append(("selective", "Selective removal (choose specific locations)"))
 
-        response = input("\nConfirm complete uninstall? [y/N]: ").strip().lower()
-        if response != "y":
-            print("❌ Uninstall cancelled.")
-            sys.exit(0)
+    # Option 5: Cancel
+    options.append(("cancel", "Cancel"))
 
-        uninstall_skill_complete(skill_name, locations)
+    # Display Options
+    for i, (opt_id, label) in enumerate(options, 1):
+        print(f"   {i}. {label}")
 
-    elif choice == "2":
-        # Selective removal
-        print("\n🗑️  Select locations to remove:")
-        p_ids = list(locations.keys())
-        for i, p_id in enumerate(p_ids, 1):
-            info = locations[p_id]
-            type_str = "symlink" if info["is_symlink"] else "directory"
-            print(f"   {i}. {info['name']} [{type_str}]")
+    choice_idx = input(f"\nEnter choice [1]: ").strip()
+    if not choice_idx:
+        choice_idx = "1"
 
-        choice = input(f"\nEnter choice (e.g. '1,2'): ").strip()
-        if not choice:
-            print("\n❌ No locations selected. Uninstall cancelled.")
-            sys.exit(0)
+    try:
+        idx = int(choice_idx) - 1
+        if idx < 0 or idx >= len(options):
+            raise ValueError
+        selected_opt = options[idx][0]
+    except ValueError:
+        print("❌ Invalid choice. Cancelled.")
+        sys.exit(0)
 
-        selected_ids = []
-        for i, p_id in enumerate(p_ids, 1):
-            if str(i) in choice.split(","):
-                selected_ids.append(p_id)
-
-        if not selected_ids:
-            print("\n❌ No valid locations selected. Uninstall cancelled.")
-            sys.exit(0)
-
-        # Confirm
-        print(
-            f"\n⚠️  Will remove from: {', '.join([locations[pid]['name'] for pid in selected_ids])}"
-        )
-        response = input("Confirm? [y/N]: ").strip().lower()
-
-        if response != "y":
-            print("❌ Uninstall cancelled.")
-            sys.exit(0)
-
-        uninstall_skill_selective(skill_name, selected_ids, locations)
-
-    else:
+    if selected_opt == "cancel":
         print("❌ Uninstall cancelled.")
         sys.exit(0)
+
+    keys_to_remove = []
+
+    if selected_opt == "uninstall_project":
+        keys_to_remove = [k for k, v in locations.items() if v["scope"] == "project"]
+    elif selected_opt == "uninstall_global":
+        keys_to_remove = [k for k, v in locations.items() if v["scope"] == "global"]
+    elif selected_opt == "uninstall_all":
+        keys_to_remove = list(locations.keys())
+    elif selected_opt == "selective":
+        print("\nSelect locations to remove:")
+        loc_keys = list(locations.keys())
+        for i, key in enumerate(loc_keys, 1):
+            info = locations[key]
+            print(f"   {i}. {info['name']} ({info['scope']})")
+
+        sel = input("Enter choices (e.g. 1,2): ").strip()
+        for s in sel.split(","):
+            if s.strip().isdigit():
+                k_idx = int(s.strip()) - 1
+                if 0 <= k_idx < len(loc_keys):
+                    keys_to_remove.append(loc_keys[k_idx])
+
+    if not keys_to_remove:
+        print("❌ No locations selected.")
+        sys.exit(0)
+
+    # Confirmation
+    print(f"\n⚠️  Will remove {len(keys_to_remove)} item(s).")
+    if input("Confirm? [y/N]: ").strip().lower() != "y":
+        print("❌ Cancelled.")
+        sys.exit(0)
+
+    uninstall_skill_selective(skill_name, keys_to_remove, locations)
 
 
 if __name__ == "__main__":

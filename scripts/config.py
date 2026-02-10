@@ -7,16 +7,34 @@ from pathlib import Path
 # Global: ~/.agents/skills/  (same as npx skills -g)
 SKILL_REPO_GLOBAL = Path.home() / ".agents" / "skills"
 
-# Project-Level: ./.agents/skills/ (same as npx skills without -g)
-SKILL_REPO_PROJECT = Path.cwd() / ".agents" / "skills"
+
+def get_project_root() -> Path:
+    """Find the project root by looking for .agents directory or .git directory."""
+    current = Path.cwd()
+    # Check parent directories up to root
+    # Limit to reasonable depth to avoid scanning entire filesystem if lost
+    for parent in [current] + list(current.parents):
+        if (parent / ".agents").exists() or (parent / ".git").exists():
+            return parent
+    return current
+
+
+PROJECT_ROOT = get_project_root()
+
+# Central Skill Repository (unified with npx skills)
+# Global: ~/.agents/skills/  (same as npx skills -g)
+SKILL_REPO_GLOBAL = Path.home() / ".agents" / "skills"
+
+# Project-Level: PROJECT_ROOT/.agents/skills/ (same as npx skills without -g)
+SKILL_REPO_PROJECT = PROJECT_ROOT / ".agents" / "skills"
 
 # Initial Metadata paths
 SYNC_METADATA_GLOBAL = Path.home() / ".agents" / ".skill_manager_metadata.json"
-SYNC_METADATA_PROJECT = Path.cwd() / ".agents" / ".skill_manager_metadata.json"
+SYNC_METADATA_PROJECT = PROJECT_ROOT / ".agents" / ".skill_manager_metadata.json"
 
 # npx skills lock file (for detecting skills installed via npx skills)
 NPX_SKILLS_LOCK_GLOBAL = Path.home() / ".agents" / ".skill-lock.json"
-NPX_SKILLS_LOCK_PROJECT = Path.cwd() / ".agents" / ".skill-lock.json"
+NPX_SKILLS_LOCK_PROJECT = PROJECT_ROOT / ".agents" / ".skill-lock.json"
 
 # Legacy repo path (for migration)
 LEGACY_SKILL_REPO = Path.home() / ".skill_repo"
@@ -260,7 +278,7 @@ def get_platform_target_path(platform_id: str, scope: str) -> Path:
         return None
 
     if scope == "project":
-        return Path.cwd() / conf["local"]
+        return PROJECT_ROOT / conf["local"]
     else:
         return conf["global"]
 

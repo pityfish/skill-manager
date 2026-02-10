@@ -80,7 +80,7 @@ def get_platform_paths(scope: str) -> dict:
 
     # improved local install scanning
     available = {}
-    cwd = Path.cwd()
+    cwd = config.PROJECT_ROOT
 
     for name, conf in config.SUPPORTED_PLATFORMS.items():
         local_rel_path = conf["local"]
