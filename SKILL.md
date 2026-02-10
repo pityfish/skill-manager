@@ -43,6 +43,7 @@ python3 scripts/sync_skill.py <skill_name>
 
 ### 5. 🆙 Update Skills
 **Usage**: Update installed skills to latest versions.
+**Interactive Mode**: Run without arguments to see the TUI menu.
 **Command**:
 ```bash
 python3 scripts/update_skills.py
@@ -50,14 +51,16 @@ python3 scripts/update_skills.py
 
 ### 6. 🗑️ Uninstall Skill
 **Usage**: Remove a skill and clean up configurations.
+**Interactive Mode (Preferred)**: Run **WITHOUT** arguments to enter a TUI-based selection menu across scopes.
 **Command**:
 ```bash
-python3 scripts/uninstall_skill.py [skill_name]
+python3 scripts/uninstall_skill.py
 ```
 
 ## 🧠 Agent Protocol
 
 1.  **Strictly Non-Autonomous Installation**: After running `npx skills find`, you must show the list to the user and wait. **Proactive installation is strictly forbidden.**
-2.  **Explicit Consent for Scope**: Never assume a skill should be Global. Always ask the user: "Which scope (Global or Project) should I use?"
-3.  **No Ghost Actions**: All install, uninstall, and sync actions must be in response to direct user commands.
-4.  **Verification**: Always use `python3 scripts/list_skills.py` to confirm the current state before making suggestions.
+2.  **Interaction First**: If the user gives a generic command like "uninstall skills" or "update tools", **DO NOT** ask for names or run `list_skills` first. Directly launch the corresponding script without arguments to provide the user with a TUI selection menu.
+3.  **Explicit Consent for Scope**: Never assume a skill should be Global. Always ask the user: "Which scope (Global or Project) should I use?"
+4.  **No Ghost Actions**: All install, uninstall, and sync actions must be in response to direct user commands.
+5.  **Verification**: Always use `python3 scripts/list_skills.py` to confirm the current state before making suggestions.
