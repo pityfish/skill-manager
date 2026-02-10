@@ -43,6 +43,25 @@ def clone_git_repo(url: str, target_dir: Path) -> Path:
         sys.exit(1)
 
 
+def install_via_npx(skill_name: str, scope: str = "project") -> bool:
+    """Install a skill via npx skills add."""
+    cmd = ["npx", "skills", "add", skill_name, "-y"]
+    if scope == "global":
+        cmd.append("-g")
+
+    print(f"   ⚙️  Running '{' '.join(cmd)}'...")
+    try:
+        # For project scope, we should be in PROJECT_ROOT
+        cwd = str(config.PROJECT_ROOT) if scope == "project" else None
+        subprocess.run(cmd, cwd=cwd, check=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+    except FileNotFoundError:
+        print("   ❌ npx not found. Cannot install via Registry.")
+        return False
+
+
 def get_skill_name(skill_path: Path) -> str:
     """Extract skill name from path or SKILL.md."""
     # If it's a .skill file, use the filename
@@ -417,6 +436,7 @@ def main():
 
     source_input = args.skill_path
     is_git = False
+    is_npx = False
     temp_dir = None
     source_path = None
     skill_name = None
@@ -436,11 +456,25 @@ def main():
         else:
             source_path = Path(source_input).resolve()
             if not source_path.exists():
-                print(f"❌ Error: Path does not exist: {source_path}")
-                sys.exit(1)
-            skill_name = get_skill_name(source_path)
-            print(f"📦 Installing skill: {skill_name}")
-            print(f"   Source: {source_path}")
+                # Potential Community Registry Skill
+                print(
+                    f"🔍 Path '{source_input}' not found. Trying Community Registry..."
+                )
+                skill_name = source_input
+                if install_via_npx(skill_name, args.scope):
+                    # If successful, the skill is now in the repo
+                    is_npx = True
+                    source_path = config.get_skill_repo(args.scope) / skill_name
+                    print(f"✅ Successfully installed '{skill_name}' via Registry!")
+                else:
+                    print(
+                        f"❌ Error: '{source_input}' is not a valid path, Git URL, or Registry skill."
+                    )
+                    sys.exit(1)
+            else:
+                skill_name = get_skill_name(source_path)
+                print(f"📦 Installing skill: {skill_name}")
+                print(f"   Source: {source_path}")
 
         # Check if source is already inside a managed repo
         is_inside_global = False
@@ -507,7 +541,9 @@ def main():
         # Update metadata
         # Detect if it's a local git repo even if installed from path
         final_source_type = config.SOURCE_TYPE_LOCAL
-        if is_git:
+        if is_npx:
+            final_source_type = config.SOURCE_TYPE_NPX
+        elif is_git:
             final_source_type = config.SOURCE_TYPE_GIT
         elif (repo_path / ".git").exists():
             # If we copied a .git folder, it's a git repo

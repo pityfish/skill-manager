@@ -27,12 +27,14 @@ npx skills find <search_query>
 
 **Commands**:
 ```bash
-# Option A: From Community Registry (Preferred)
-npx skills add <package_name> -g -y  # Global Install
-npx skills add <package_name> -y     # Project Install
+# Unified Installation Flow (Recommended)
+# Works for: Registry Name, Git URL, or Local Path
+python3 scripts/install_skill.py <skill_source>
 
-# Option B: From Git URL (Custom/Private)
-python3 scripts/install_skill.py <git_url>
+# Examples:
+python3 scripts/install_skill.py shell             # Registry skill
+python3 scripts/install_skill.py https://github... # Git skill
+python3 scripts/install_skill.py ./my-skill        # Local skill
 ```
 
 ### 3. 📋 List & Check Status
