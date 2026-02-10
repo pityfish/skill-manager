@@ -317,8 +317,8 @@ def main():
     parser.add_argument(
         "--scope",
         choices=["global", "project"],
-        default="global",
-        help="Installation scope: 'global' (default) or 'project'",
+        default=None,
+        help="Installation scope: Auto-detect (default), 'global', or 'project'",
     )
     parser.add_argument(
         "--local",
@@ -330,11 +330,34 @@ def main():
 
     # Handle deprecated --local flag
     if args.local:
-        if args.scope != "global":
+        if args.scope and args.scope != "global":
+            # If someone explicitly says --scope global --local, that's weird, but prioritize local flag?
+            # Or scope? The original code prioritized local.
+            pass
+        # If scope is Global, warn? Original code warned.
+        if args.scope == "global":
             print(
                 "⚠️  Warning: Both --local and --scope provided. Using --local (project scope)."
             )
         args.scope = "project"
+
+    # Auto-detect scope if not provided
+    if args.scope is None:
+        # Check if we are in a project context
+        # config.PROJECT_ROOT uses .agents or .git to find root.
+        # If it found a root that is NOT just CWD (unless CWD is root), it's a project.
+        # Actually, simpler: check if .agents or .git exists in PROJECT_ROOT.
+
+        is_in_project = (config.PROJECT_ROOT / ".agents").exists() or (
+            config.PROJECT_ROOT / ".git"
+        ).exists()
+
+        if is_in_project:
+            args.scope = "project"
+            print("🏠 Detected Project context. Defaulting to 'project' scope.")
+        else:
+            args.scope = "global"
+            print("🌍 No project detected. Defaulting to 'global' scope.")
 
     source_input = args.skill_path
     is_git = False

@@ -36,28 +36,31 @@ npx skills add <owner/pkg> -g -y
 ```
 
 #### Plan B: Install from Git / Local
-- **Global Install** (default, for generic tools):
+- **Auto-Detect Scope** (Default):
+  Automatically installs to **project** if running inside a project, otherwise **global**.
   ```bash
   python3 scripts/install_skill.py <URL_or_Path>
-  # or explicitly
-  python3 scripts/install_skill.py <URL_or_Path> --scope global
   ```
-- **Project Install** (for project-specific tools):
+- **Force Scope**:
   ```bash
+  python3 scripts/install_skill.py <URL_or_Path> --scope global
   python3 scripts/install_skill.py <URL_or_Path> --scope project
   ```
 
 ### 3. 📋 List Installed Skills
 See what tools are available and their **Sync Status** (supports Global and Project scopes):
 ```bash
-python3 scripts/list_synced.py
+python3 scripts/list_skills.py
 ```
 
 ### 4. 🗑️ Uninstall Skills
-Unified uninstallation entry point (handles both npx and git installs, cleans up symlinks across all platforms, supports Global/Project selection):
-```bash
-python3 scripts/uninstall_skill.py <skill-name>
-```
+- **For `npx` installed skills**:
+    - Project: `npx skills remove <skill-name>`
+    - Global: `npx skills remove -g <skill-name>`
+- **For Manual/Git skills (or unified cleanup)**:
+    ```bash
+    python3 scripts/uninstall_skill.py <skill-name>
+    ```
 
 ### 5. 🔄 Update/Sync Skills
 ```bash
@@ -68,7 +71,7 @@ python3 scripts/update_skills.py
 ## 💡 Best Practices for Agents
 1.  **Search First**: When facing unknown requirements, use `npx skills find` to search first.
 2.  **Global Install**: For general-purpose tools (like browser, PDF tools), ALWAYS use `-g` (for npx) or default install (for python) to ensure the Skill is available to ALL Projects.
-3.  **Verify Installation**: After installation, run `python3 scripts/list_synced.py` to confirm the Skill is successfully synced to the current environment (e.g., Antigravity/Gemini).
+3.  **Verify Installation**: After installation, run `python3 scripts/list_skills.py` to confirm the Skill is successfully synced to the current environment (e.g., Antigravity/Gemini).
 
 ---
 

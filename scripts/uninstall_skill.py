@@ -212,13 +212,18 @@ def main():
 
     # Check source type for npx warning
     # We check global first, then project
-    source_type, _ = config.get_skill_source_type(skill_name, scope="global")
-    if source_type == config.SOURCE_TYPE_UNKNOWN:
-        source_type, _ = config.get_skill_source_type(skill_name, scope="project")
+    source_type_global, _ = config.get_skill_source_type(skill_name, scope="global")
+    source_type_project, _ = config.get_skill_source_type(skill_name, scope="project")
 
-    if source_type == config.SOURCE_TYPE_NPX:
-        print(f"\n⚠️  This skill was installed via 'npx skills'.")
+    if source_type_global == config.SOURCE_TYPE_NPX:
+        print(f"\n⚠️  This skill is installed GLOBALLY via 'npx skills'.")
         print(f"   Recommended: Use 'npx skills remove -g {skill_name}' to uninstall.")
+
+    if source_type_project == config.SOURCE_TYPE_NPX:
+        print(f"\n⚠️  This skill is installed LOCALLY via 'npx skills'.")
+        print(
+            f"   Recommended: Use 'npx skills remove {skill_name}' (in project root) to uninstall."
+        )
 
     print("\n🗑️  Uninstall options:")
 

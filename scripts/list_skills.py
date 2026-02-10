@@ -279,7 +279,13 @@ def list_all_skills():
     # Show paths
     print(f"\n📍 Available Platform Paths:")
     print(f"   Global Repo:   {config.SKILL_REPO_GLOBAL}")
-    print(f"   Project Repo:  {config.SKILL_REPO_PROJECT}")
+
+    if config.SKILL_REPO_PROJECT.exists():
+        print(f"   Project Repo:  {config.SKILL_REPO_PROJECT}")
+    else:
+        print(
+            f"   Project Repo:  (Not detected/created at {config.SKILL_REPO_PROJECT})"
+        )
     for p_id, info in available_platforms.items():
         print(f"   {info['name']:15}: {info['path']}")
 

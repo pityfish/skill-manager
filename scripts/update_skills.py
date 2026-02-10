@@ -401,14 +401,56 @@ def main():
 
     # Check for npx update request
     if len(targets) == 1 and targets[0][0] == "__npx_update__":
-        print("\n📦 Running 'npx skills update'...\n")
-        try:
-            subprocess.run(["npx", "skills", "update"], check=True)
-            print("\n✅ npx skills update complete!")
-        except subprocess.CalledProcessError as e:
-            print(f"\n❌ npx skills update failed: {e}")
-        except FileNotFoundError:
-            print("\n❌ npx not found. Please install Node.js first.")
+        # Scan for npx skills to determine what to run
+        has_global_npx = False
+        has_project_npx = False
+
+        # Check all skills to see if we have npx ones
+        npx_skills_found = [
+            s
+            for s in config.get_all_skills_with_sources().values()
+            if s.get("source_type") == config.SOURCE_TYPE_NPX
+        ]
+
+        for s in npx_skills_found:
+            if s.get("scope") == "global":
+                has_global_npx = True
+            if s.get("scope") == "project":
+                has_project_npx = True
+
+        # If no npx skills found but user requested update, maybe they just want to update emptiness?
+        # Default to global update if nothing found, just in case.
+        if not npx_skills_found:
+            has_global_npx = True
+
+        if has_global_npx:
+            print("\n📦 Running 'npx skills update -g' (Global)...")
+            try:
+                subprocess.run(["npx", "skills", "update", "-g"], check=True)
+                print("✅ Global update complete.")
+            except subprocess.CalledProcessError as e:
+                print(f"❌ Global update failed: {e}")
+            except FileNotFoundError:
+                print("❌ npx not found.")
+
+        if has_project_npx:
+            # For project updates, we need to be in the project root
+            # config.PROJECT_ROOT should be correct
+            print(
+                f"\n🏠 Running 'npx skills update' (Project: {config.PROJECT_ROOT})..."
+            )
+            try:
+                subprocess.run(
+                    ["npx", "skills", "update"],
+                    cwd=str(config.PROJECT_ROOT),
+                    check=True,
+                )
+                print("✅ Project update complete.")
+            except subprocess.CalledProcessError as e:
+                print(f"❌ Project update failed: {e}")
+            except FileNotFoundError:
+                print("❌ npx not found.")
+
         return
 
     # Filter to only git-updatable skills

@@ -10,7 +10,13 @@ SKILL_REPO_GLOBAL = Path.home() / ".agents" / "skills"
 
 def get_project_root() -> Path:
     """Find the project root by looking for .agents directory or .git directory."""
-    current = Path.cwd()
+    # 1. Prefer INIT_CWD if available (set by npx/npm)
+    env_cwd = os.environ.get("INIT_CWD")
+    if env_cwd:
+        current = Path(env_cwd).resolve()
+    else:
+        current = Path.cwd().resolve()
+
     # Check parent directories up to root
     # Limit to reasonable depth to avoid scanning entire filesystem if lost
     for parent in [current] + list(current.parents):

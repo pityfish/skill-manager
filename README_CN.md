@@ -85,7 +85,7 @@ python3 scripts/update_skills.py
 
 **4. 查看 Agent 当前能做什么**
 ```bash
-python3 scripts/list_synced.py
+python3 scripts/list_skills.py
 ```
 
 ## 🔌 支持的智能体

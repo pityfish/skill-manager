@@ -85,7 +85,7 @@ python3 scripts/update_skills.py
 
 **4. Check what your Agent can do**
 ```bash
-python3 scripts/list_synced.py
+python3 scripts/list_skills.py
 ```
 
 ## 🔌 Supported Agents
