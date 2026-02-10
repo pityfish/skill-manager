@@ -135,7 +135,7 @@ python3 scripts/list_skills.py
 ## ❓ Troubleshooting
 
 **Q: My Agent still says it can't do X.**
-A: Make sure you installed the skill with `-g` (global) or run `python3 scripts/install_skill.py` to ensure it's synced to `~/.gemini/antigravity/skills` (or your specific agent path).
+A: Make sure you installed the skill with `-g` (global), or run `python3 scripts/list_skills.py` to check your current sync status.
 
 **Q: How do I remove a skill?**
 A: `python3 scripts/uninstall_skill.py <skill-name>`

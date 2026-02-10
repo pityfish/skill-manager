@@ -386,6 +386,35 @@ def main():
             print(f"📦 Installing skill: {skill_name}")
             print(f"   Source: {source_path}")
 
+        # Check if source is already inside a managed repo
+        is_inside_global = False
+        try:
+            # is_relative_to is Python 3.9+
+            if source_path.is_relative_to(config.SKILL_REPO_GLOBAL.resolve()):
+                is_inside_global = True
+        except Exception:
+            pass
+
+        is_inside_project = False
+        if config.SKILL_REPO_PROJECT.exists():
+            try:
+                if source_path.is_relative_to(config.SKILL_REPO_PROJECT.resolve()):
+                    is_inside_project = True
+            except Exception:
+                pass
+
+        if is_inside_global or is_inside_project:
+            repo_name = "Global" if is_inside_global else "Project"
+            print(
+                f"\n⚠️  Action Aborted: Source path is already inside managed {repo_name} Repo."
+            )
+            print(f"   Path: {source_path}")
+            print(
+                f"   - To link/sync to more agents: python3 scripts/sync_skill.py {skill_name}"
+            )
+            print(f"   - To update code: python3 scripts/update_skills.py")
+            sys.exit(0)
+
         # Determine target platforms (Global vs Local)
         available_platforms = get_platform_paths(args.scope)
         repo_path_root = config.get_skill_repo(args.scope)

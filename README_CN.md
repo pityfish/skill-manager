@@ -135,7 +135,7 @@ python3 scripts/list_skills.py
 ## ❓ 常见问题
 
 **Q: Agent 说它找不到我在用的工具。**
-A: 确保安装时加了 `-g` (全局模式)，或者运行 `python3 scripts/list_synced.py` 检查一下同步状态。
+A: 确保安装时加了 `-g` (全局模式)，或者运行 `python3 scripts/list_skills.py` 检查一下同步状态。
 
 **Q: 怎么卸载技能？**
 A: `python3 scripts/uninstall_skill.py <skill-name>`

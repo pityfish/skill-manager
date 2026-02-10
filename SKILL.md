@@ -1,91 +1,75 @@
 ---
 name: skill-manager
-description: AI Skill Manager. Find, install, sync, and manage AI Skills (MCP tools) for your agent. Supports the skills.sh ecosystem (npx skills) and Git/Local installations.
+description: The official Skill Manager for AI Agents. Use this to find, install, sync, and manage skills (MCP servers) for yourself and other agents.
 ---
 
 # Agent Skill Manager (ASM)
 
-This is your **core skill management tool**. When you need new capabilities or tools to complete a task, **you MUST use this skill first**.
+This is your **primary tool** for managing your own capabilities. Use this to install new tools, sync them across environments, and keep them updated.
 
-## 🎯 Trigger Phrases
-- User says "I need a tool to do X"
-- User says "Is there a skill for handling PDFs?"
-- User says "Install a browser skill for me"
-- User says "List installed skills"
-- User says "Sync my skills"
-- When you are stuck and wonder "Is there an existing skill that can solve this?"
+## 🛠️ Capabilities
 
-## 🚀 Core Commands
-
-Choose the most appropriate command based on the scenario.
-
-### 1. 🔍 Find Skills
-**This is the FIRST step**. Always search the `skills.sh` registry first (contains many ready-to-use tools):
+### 1. 🔍 Find Knowledge/Tools
+**Usage**: When you need a capability you don't have (e.g., "I need to search the web", "I need to read PDF files").
+**Command**:
 ```bash
-npx skills find <your_keywords>
-```
-*Examples: `npx skills find browser`, `npx skills find pdf`, `npx skills find linear`*
-
-### 2. ⬇️ Install Skills
-
-#### Plan A: Install from skills.sh (Recommended)
-If `npx skills find` returns a suitable package (e.g., `owner/pkg`):
-```bash
-# Global Install (for general purpose tools)
-npx skills add <owner/pkg> -g -y
-
-# Project Install (for project-specific tools)
-npx skills add <owner/pkg> -y
+npx skills find <search_query>
 ```
 
-#### Plan B: Install from Git / Local
-- **Auto-Detect Scope** (Default):
-  Automatically installs to **project** if running inside a project, otherwise **global**.
-  ```bash
-  python3 scripts/install_skill.py <URL_or_Path>
-  ```
-- **Force Scope**:
-  ```bash
-  python3 scripts/install_skill.py <URL_or_Path> --scope global
-  python3 scripts/install_skill.py <URL_or_Path> --scope project
-  ```
+### 2. ⬇️ Install Skill
+**Usage**: When you identify a package or Git repo to install.
 
-### 3. 📋 List Installed Skills
-See what tools are available and their **Sync Status** (supports Global and Project scopes):
+**Decision Logic (Scope)**:
+- **Global (`-g`)**: For general-purpose tools (e.g., `browser`, `clipboard`, `shell`) that should be available in **ALL** your workspaces.
+- **Project**: For workspace-specific tools (e.g., `linter`, `test-runner`) that are only relevant to the current project.
+
+**Commands**:
+```bash
+# Option A: From Community Registry (Preferred)
+npx skills add <package_name> -g -y  # Global Install
+npx skills add <package_name> -y     # Project Install
+
+# Option B: From Git URL (Custom/Private)
+python3 scripts/install_skill.py <git_url> --scope global
+python3 scripts/install_skill.py <git_url> --scope project
+```
+
+### 3. 📋 List & Check Status
+**Usage**: View all installed skills and check if they are properly synced to your current environment.
+**Command**:
 ```bash
 python3 scripts/list_skills.py
 ```
+*Tip: Pay attention to the `Sync Status` column.*
 
-### 4. 🗑️ Uninstall Skills
-- **For `npx` installed skills**:
-    - Project: `npx skills remove <skill-name>`
-    - Global: `npx skills remove -g <skill-name>`
-- **For Manual/Git skills (or unified cleanup)**:
-    ```bash
-    python3 scripts/uninstall_skill.py <skill-name>
-    ```
-
-### 5. 🔄 Update/Sync Skills
+### 4. � Sync/Fix Skill
+**Usage**: 
+1. If installed skills are **missing** from your tool list.
+2. To register an existing skill with a newly added agent.
+**Command**:
 ```bash
-# Interactive update menu for both Global and Project skills
+python3 scripts/sync_skill.py <skill_name>
+```
+
+### 5. 🆙 Update All Skills
+**Usage**: Update all installed skills (both `npx` and `git` sourced) to their latest versions.
+**Command**:
+```bash
 python3 scripts/update_skills.py
 ```
 
-## 💡 Best Practices for Agents
-1.  **Search First**: When facing unknown requirements, use `npx skills find` to search first.
-2.  **Scope Selection**:
-    -   **Global (`-g`)**: For general-purpose tools (browser, PDF, etc.) needed across ALL projects.
-    -   **Project (default)**: For project-specific tools (testing, linting, specialized APIs) needed only here.
-3.  **Verify Installation**: After installation, run `python3 scripts/list_skills.py` to confirm the Skill is successfully synced to the current environment (e.g., Antigravity/Gemini).
+### 6. 🗑️ Uninstall Skill
+**Usage**: Remove a skill and clean up its configuration.
+**Command**:
+```bash
+python3 scripts/uninstall_skill.py <skill_name>
+```
 
----
+## 🧠 Agent Protocol
 
-## 📂 Directory Structure Reference
--   **npx skills**: Installed in `~/.agents/skills/` (Global)
--   **Git skills**: Cloned to `~/.agents/skills/` and symlinked to platforms
--   **Platform Sync Paths**:
-    -   **Global**: `~/.agents/skills/`
-    -   **Project**: `./.agents/skills/`
-    -   **Supported Platforms**: Claude Code, Antigravity, Gemini CLI, Cursor, GitHub Copilot, OpenAI Codex, Amp, Kimi Code CLI, Replit, Augment, OpenClaw, Cline, CodeBuddy, Command Code, Continue, Crush, Droid, Goose, Junie, iFlow, Kilo, Kiro, Kode, MCPJam, Mistral Vibe, Mux, OpenCode, OpenHands, Pi, Qoder, Qwen, Roo Code, Trae, Windsurf, Zencoder, Neovate, Pochi, AdaL...
-
-This tool automatically handles all path mappings. You only need to focus on the commands in `scripts/`.
+1.  **Search First**: Do not assume tools exist. Use `npx skills find` to discover availability.
+2.  **Verify Scope**: Always determine if a tool is "Global" (meant for you, the agent) or "Project" (meant for the repo).
+3.  **Self-Correction**:
+    -   If you install a tool but cannot see it: **DO NOT install again**.
+    -   Run `python3 scripts/list_skills.py` to verify it exists.
+    -   Run `python3 scripts/sync_skill.py <name>` to force a config sync.
