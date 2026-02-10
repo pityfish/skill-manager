@@ -23,11 +23,6 @@ It centralizes **ALL** capabilities into `~/.agents/skills/` and automatically s
     *   **Global**: `~/.agents/skills/` (available to all projects).
     *   **Project**: `./.agents/skills/` (isolated to current project).
 *   **Universal Sync**: Install once, available everywhere (Claude, Gemini, Cursor, Trae, Replit, etc.).
-*   **Full TUI Experience**: Beautiful interactive interface for management.
-*   **Smart Scope Detection**:
-    *   **Silent Promotion**: Automatically defaults to Global when in HOME directory (no TUI popup).
-    *   **Conflict Resolution**: Only asks for scope if the skill exists in both Global and Project repos.
-*   **Native Registry Support**: Seamlessly handles skills with `@` identifiers (e.g., `org/repo@name`).
 
 ## ⚡️ What can you manage?
 
