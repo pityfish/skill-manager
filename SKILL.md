@@ -1,6 +1,6 @@
 ---
 name: skill-manager
-description: The Skill Manager for AI Agents. Use this to find, install, sync, and manage skills for yourself and other agents.
+description: The Skill Manager for AI Agents. Use this to find, install, sync, and manage skills.
 ---
 
 # Agent Skill Manager (ASM)
@@ -77,12 +77,3 @@ python3 scripts/update_skills.py --all --npx
 python3 scripts/uninstall_skill.py [skill_name]
 ```
 *Note: This automatically triggers `npx skills remove` for Registry skills.*
-
-## 🧠 Agent Protocol
-
-1.  **Search First**: Do not assume tools exist. Use `npx skills find` to discover availability.
-2.  **Verify Scope**: Always determine if a tool is "Global" (meant for you, the agent) or "Project" (meant for the repo). **Expect a TUI prompt to confirm this.**
-3.  **Self-Correction**:
-    -   If you install a tool but cannot see it: **DO NOT install again**.
-    -   Run `python3 scripts/list_skills.py` to verify it exists.
-    -   Run `python3 scripts/sync_skill.py <name>` to force a config sync.
