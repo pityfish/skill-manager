@@ -31,8 +31,11 @@ npx skills find <your_keywords>
 #### Plan A: Install from skills.sh (Recommended)
 If `npx skills find` returns a suitable package (e.g., `owner/pkg`):
 ```bash
-# IMPORTANT: Must use -g for global availability, -y for auto-confirmation
+# Global Install (for general purpose tools)
 npx skills add <owner/pkg> -g -y
+
+# Project Install (for project-specific tools)
+npx skills add <owner/pkg> -y
 ```
 
 #### Plan B: Install from Git / Local
@@ -70,7 +73,9 @@ python3 scripts/update_skills.py
 
 ## 💡 Best Practices for Agents
 1.  **Search First**: When facing unknown requirements, use `npx skills find` to search first.
-2.  **Global Install**: For general-purpose tools (like browser, PDF tools), ALWAYS use `-g` (for npx) or default install (for python) to ensure the Skill is available to ALL Projects.
+2.  **Scope Selection**:
+    -   **Global (`-g`)**: For general-purpose tools (browser, PDF, etc.) needed across ALL projects.
+    -   **Project (default)**: For project-specific tools (testing, linting, specialized APIs) needed only here.
 3.  **Verify Installation**: After installation, run `python3 scripts/list_skills.py` to confirm the Skill is successfully synced to the current environment (e.g., Antigravity/Gemini).
 
 ---
