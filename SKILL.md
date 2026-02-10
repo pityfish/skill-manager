@@ -20,7 +20,7 @@ npx skills find <search_query>
 **Usage**: When you identify a package or Git repo to install.
 
 **Decision Logic (Scope)**:
-- **Global (`-g`)**: For general-purpose tools (e.g., `browser`, `clipboard`, `shell`) that should be available in **ALL** your workspaces.
+- **Global**: For general-purpose tools (e.g., `browser`, `clipboard`, `shell`) that should be available in **ALL** your workspaces. Select this in the TUI when prompted.
 - **Project**: For workspace-specific tools (e.g., `linter`, `test-runner`) that are only relevant to the current project.
 
 **Commands**:

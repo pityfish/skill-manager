@@ -23,6 +23,7 @@ It centralizes **ALL** capabilities into `~/.agents/skills/` and automatically s
     *   **Global**: `~/.agents/skills/` (available to all projects).
     *   **Project**: `./.agents/skills/` (isolated to current project).
 *   **Universal Sync**: Install once, available everywhere (Claude, Gemini, Cursor, Trae, Replit, etc.).
+*   **Full TUI Experience**: Beautiful interactive interface for Installation (Scope), Update (Status check), and Uninstallation.
 *   **Smart Management**: Auto-detects updates (`npx skills update` vs `git pull`).
 
 
@@ -79,7 +80,7 @@ python3 scripts/install_skill.py https://github.com/user/project-tool.git --scop
 ```
 
 **3. Sync & Update**
-# Interactive
+# Interactive TUI (Select skills to update)
 python3 scripts/update_skills.py
 
 # Auto-Update All
@@ -137,7 +138,7 @@ python3 scripts/list_skills.py
 ## ❓ Troubleshooting
 
 **Q: My Agent still says it can't do X.**
-A: Make sure you installed the skill with `-g` (global), or run `python3 scripts/list_skills.py` to check your current sync status.
+A: Ensure you selected the correct scope in the TUI menu, or run `python3 scripts/list_skills.py` to check the detailed sync status and repository paths.
 
 **Q: How do I remove a skill?**
 A: `python3 scripts/uninstall_skill.py <skill-name>`

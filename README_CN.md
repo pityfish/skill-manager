@@ -23,6 +23,7 @@
     *   **全局 (Global)**: `~/.agents/skills/` (所有项目共用)
     *   **项目 (Project)**: `./.agents/skills/` (仅限当前项目)
 *   **一次安装，处处可用**: 自动同步到 Claude, Gemini, Cursor, Trae, Replit 等所有平台。
+*   **全流程 TUI 交互**: 安装 (Scope 选择)、更新 (状态检测)、卸载 (一站式清理) 均提供精美的终端交互界面。
 *   **智能维护**: 自动区分技能来源，提供正确的更新方式 (`npx` vs `git`)。
 
 
@@ -79,7 +80,7 @@ python3 scripts/install_skill.py https://github.com/user/project-tool.git --scop
 ```
 
 **3. 同步与更新**
-# 交互式更新
+# 交互式更新 (TUI 按需勾选)
 python3 scripts/update_skills.py
 
 # 一键自动更新 (推荐)
@@ -137,7 +138,7 @@ python3 scripts/list_skills.py
 ## ❓ 常见问题
 
 **Q: Agent 说它找不到我在用的工具。**
-A: 确保安装时加了 `-g` (全局模式)，或者运行 `python3 scripts/list_skills.py` 检查一下同步状态。
+A: 确保你在 TUI 菜单中选择了正确的作用域，或者运行 `python3 scripts/list_skills.py` 检查详细的同步状态和仓库路径。
 
 **Q: 怎么卸载技能？**
 A: `python3 scripts/uninstall_skill.py <skill-name>`

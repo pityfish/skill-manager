@@ -3,10 +3,6 @@ import os
 import json
 from pathlib import Path
 
-# Central Skill Repository (unified with npx skills)
-# Global: ~/.agents/skills/  (same as npx skills -g)
-SKILL_REPO_GLOBAL = Path.home() / ".agents" / "skills"
-
 
 def get_project_root() -> Path:
     """Find the project root by looking for .agents directory or .git directory."""
@@ -42,8 +38,6 @@ SYNC_METADATA_PROJECT = PROJECT_ROOT / ".agents" / ".skill_manager_metadata.json
 NPX_SKILLS_LOCK_GLOBAL = Path.home() / ".agents" / ".skill-lock.json"
 NPX_SKILLS_LOCK_PROJECT = PROJECT_ROOT / ".agents" / ".skill-lock.json"
 
-# Legacy repo path (for migration)
-LEGACY_SKILL_REPO = Path.home() / ".skill_repo"
 
 # Installation source types
 SOURCE_TYPE_NPX = "npx-skills"  # Installed via npx skills

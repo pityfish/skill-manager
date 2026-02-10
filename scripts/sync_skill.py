@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Sync an existing skill (Global or Project) to selected platforms.
-Does NOT install or update code. strictly manages symlinks.
+Strictly manages symlinks, does NOT install or update code.
 """
 
 import sys

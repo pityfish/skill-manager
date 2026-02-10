@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Install a skill to ~/.skill_repo and sync to detected platforms via symlinks.
-Supports installing from local path or Git URL, and syncing globally or locally.
+Install a skill to the central repository (.agents/skills) and sync to detected agent platforms via symlinks.
+Supports installing from local path or Git URL, and supports Global or Project scopes.
 """
 
 import os
@@ -206,8 +206,44 @@ def create_symlink(source: Path, target: Path, force: bool = False):
     target.symlink_to(source)
 
 
+def ask_installation_scope() -> str:
+    """Prompt user to select installation scope using TUI (Project or Global)."""
+    # Try to import TUI
+    try:
+        import tui
+    except ImportError:
+        # Fallback if tui.py missing
+        sys.path.append(str(Path(__file__).parent))
+        try:
+            import tui
+        except ImportError:
+            tui = None
+
+    if not tui:
+        # Silent fallback or simple prompt?
+        return "project"
+
+    options = [
+        {
+            "id": "project",
+            "label": "Project (Install in current directory (committed with your project))",
+            "checked": True,
+        },
+        {"id": "global", "label": "Global", "checked": False},
+    ]
+
+    menu = tui.MultiSelectMenu("Installation scope", options, single_select=True)
+
+    try:
+        selection = menu.run()
+        return selection if selection else "project"
+    except KeyboardInterrupt:
+        print("\n❌ Cancelled.")
+        sys.exit(0)
+
+
 def ask_sync_targets(available_platforms: dict, is_local: bool) -> list[str]:
-    """Ask user which platforms to sync to based on available ones."""
+    """Ask user which platforms to sync to based on available platforms using TUI."""
     if not available_platforms:
         if is_local:
             print("\n⚠️  No local project configuration found in current directory.")
@@ -216,32 +252,99 @@ def ask_sync_targets(available_platforms: dict, is_local: bool) -> list[str]:
             print("\n⚠️  No supported platforms detected on this system.")
         return []
 
-    mode_str = "Local Project" if is_local else "System Global"
-    print(f"\n🔗 Detected {mode_str} targets. Select which to enable this skill:")
+    # Try to import TUI (local project script)
+    try:
+        import tui
+    except ImportError:
+        # Fallback if tui.py missing (try adding current dir to path)
+        sys.path.append(str(Path(__file__).parent))
+        try:
+            import tui
+        except ImportError:
+            tui = None
 
-    p_ids = list(available_platforms.keys())
-    for i, p_id in enumerate(p_ids, 1):
-        info = available_platforms[p_id]
-        print(f"   {i}. {info['name']} ({info['path']})")
+    if not tui:
+        print("\n⚠️  TUI module missing. Using default selection (All).")
+        return list(available_platforms.keys())
 
-    all_idx = len(p_ids) + 1
-    print(f"   {all_idx}. All detected (default)")
+    # Group platforms
+    universal_targets = []
+    other_targets = []
 
-    choice = input(f"\nEnter choice (e.g. '1,2' or '{all_idx}'): ").strip()
+    for p_id, info in available_platforms.items():
+        # Check if Universal (.agents/skills)
+        path_str = str(info["path"])
 
-    if not choice:
-        choice = str(all_idx)
+        # Heuristic: ends with .agents/skills or .agent/skills?
+        if ".agents/skills" in path_str:
+            universal_targets.append((p_id, info))
+        else:
+            other_targets.append((p_id, info))
 
-    selected_ids = []
+    # Construct TUI options
+    options = []
+    sections = []
 
-    # Handle 'all' cases
-    if str(all_idx) in choice or "all" in choice.lower():
-        return p_ids
+    # 1. Universal Section
+    if universal_targets:
+        sections.append(
+            {
+                "title": f"Universal ({config.SKILL_REPO_PROJECT.name if is_local else '.agents/skills'})",
+                "start_index": len(options),
+            }
+        )
 
-    for i, p_id in enumerate(p_ids, 1):
-        if str(i) in choice.split(","):
-            selected_ids.append(p_id)
+        # Sort Universal items alphabetically
+        universal_targets.sort(key=lambda x: x[1]["name"])
 
+        for p_id, info in universal_targets:
+            options.append(
+                {
+                    "id": p_id,
+                    "label": f"{info['name']}",
+                    "checked": True,  # Default On for universal
+                    "disabled": True,  # Fixed, cannot be unchecked
+                }
+            )
+
+    # 2. Others Section
+    if other_targets:
+        sections.append({"title": "Other agents", "start_index": len(options)})
+
+        # Sort Others alphabetically
+        other_targets.sort(key=lambda x: x[1]["name"])
+
+        for p_id, info in other_targets:
+            display_path = info["path"]
+            if is_local:
+                try:
+                    display_path = info["path"].relative_to(config.PROJECT_ROOT)
+                except ValueError:
+                    pass
+
+            options.append(
+                {
+                    "id": p_id,
+                    "label": f"{info['name']} ({display_path})",
+                    "checked": False,  # Default Off for others?
+                }
+            )
+
+    menu = tui.MultiSelectMenu(
+        "Which agents do you want to install to?", options, sections
+    )
+
+    # Instructions Footer
+    print("\033[2m  ↑↓ move, space select, enter confirm\033[0m")
+
+    try:
+        selected_ids = menu.run()
+    except KeyboardInterrupt:
+        print("\n❌ Cancelled.")
+        sys.exit(0)
+
+    # Calculate summary for display
+    print(f"\n✅ Selected: {len(selected_ids)} agents")
     return selected_ids
 
 
@@ -343,21 +446,7 @@ def main():
 
     # Auto-detect scope if not provided
     if args.scope is None:
-        # Check if we are in a project context
-        # config.PROJECT_ROOT uses .agents or .git to find root.
-        # If it found a root that is NOT just CWD (unless CWD is root), it's a project.
-        # Actually, simpler: check if .agents or .git exists in PROJECT_ROOT.
-
-        is_in_project = (config.PROJECT_ROOT / ".agents").exists() or (
-            config.PROJECT_ROOT / ".git"
-        ).exists()
-
-        if is_in_project:
-            args.scope = "project"
-            print("🏠 Detected Project context. Defaulting to 'project' scope.")
-        else:
-            args.scope = "global"
-            print("🌍 No project detected. Defaulting to 'global' scope.")
+        args.scope = ask_installation_scope()
 
     source_input = args.skill_path
     is_git = False
@@ -449,13 +538,21 @@ def main():
         )
 
         # Update metadata
-        source_type = config.SOURCE_TYPE_GIT if is_git else config.SOURCE_TYPE_LOCAL
+        # Detect if it's a local git repo even if installed from path
+        final_source_type = config.SOURCE_TYPE_LOCAL
+        if is_git:
+            final_source_type = config.SOURCE_TYPE_GIT
+        elif (repo_path / ".git").exists():
+            # If we copied a .git folder, it's a git repo
+            final_source_type = config.SOURCE_TYPE_GIT
+            print(f"   ℹ️  Marked as Git repository (updates enabled).")
+
         update_sync_metadata(
             skill_name,
             sync_targets,
             available_platforms,
             scope=args.scope,
-            source_type=source_type,
+            source_type=final_source_type,
             source_url=source_input,
         )
 

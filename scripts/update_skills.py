@@ -155,16 +155,23 @@ def get_all_updatable_skills():
 
 
 def ask_skills_to_update(skills):
-    """Interactive menu to select skills."""
-    print("\n📦 Select skills to update:\n")
+    """Interactive TUI menu to select skills for update."""
+    # Try to import TUI
+    sys.path.append(str(Path(__file__).parent))
+    try:
+        import tui
+    except ImportError:
+        tui = None
 
-    # Categorize by source type
-    npx_skills = []
-    git_skills = []
-    local_skills = []
-    unknown_skills = []
+    if not tui:
+        print("\n⚠️  TUI module missing. Falling back to simple default.")
+        targets = []
+        for name, path, source_type, source_info, scope in skills:
+            if source_type == config.SOURCE_TYPE_GIT or (path / ".git").exists():
+                targets.append((name, path, source_type, "git"))
+        return targets
 
-    print("   Checking for updates (parallel)...")
+    print("\n📦 Checking for updates (parallel)...")
 
     # Run git checks in parallel for git-based skills
     git_futures = {}
@@ -173,6 +180,11 @@ def ask_skills_to_update(skills):
             if source_type == config.SOURCE_TYPE_GIT or (path / ".git").exists():
                 git_futures[name] = executor.submit(check_updates_available, path)
 
+    # Prepare data for TUI
+    git_skills = []
+    npx_skills = []
+    local_skills = []
+
     for name, path, source_type, source_info, scope in skills:
         status_msg = ""
         has_update = False
@@ -180,146 +192,114 @@ def ask_skills_to_update(skills):
         if name in git_futures:
             has_update, status_msg = git_futures[name].result()
         elif source_type == config.SOURCE_TYPE_NPX:
-            status_msg = "Use 'npx skills update'"
+            status_msg = "Managed via npx"
         elif source_type == config.SOURCE_TYPE_LOCAL:
-            status_msg = "Manual update required"
+            status_msg = "Manual update"
         else:
-            status_msg = "Unknown source"
+            status_msg = "Unknown"
 
-        # Add scope info to entry
-        entry = (name, path, source_type, source_info, has_update, status_msg, scope)
+        entry = {
+            "name": name,
+            "path": path,
+            "source_type": source_type,
+            "has_update": has_update,
+            "status": status_msg,
+            "scope": scope,
+        }
 
         if source_type == config.SOURCE_TYPE_NPX:
             npx_skills.append(entry)
         elif source_type == config.SOURCE_TYPE_GIT or (path / ".git").exists():
             git_skills.append(entry)
-        elif source_type == config.SOURCE_TYPE_LOCAL:
-            local_skills.append(entry)
         else:
-            unknown_skills.append(entry)
+            local_skills.append(entry)
 
-    # Display Menu
-    all_options = []
-    idx = 1
+    # Build TUI Options
+    options = []
+    sections = []
 
-    def get_scope_badge(scope):
-        if scope == "global":
-            return "[Global]"
-        if scope == "project":
-            return "[Project]"
-        return ""
-
+    # Git Section
     if git_skills:
-        print(f"\n   🔗 Git-based skills (updatable with git pull):")
-        for (
-            name,
-            path,
-            source_type,
-            source_info,
-            has_update,
-            status_msg,
-            scope,
-        ) in git_skills:
-            marker = "* " if has_update else "  "
-            badge = get_scope_badge(scope)
-            print(f"   {idx}. {marker}{name:25} {badge} [{status_msg}]")
-            all_options.append((name, path, source_type, "git"))
-            idx += 1
+        sections.append({"title": "Git Repositories", "start_index": len(options)})
+        # Sort by update availability first, then name
+        git_skills.sort(key=lambda x: (not x["has_update"], x["name"]))
 
+        for s in git_skills:
+            label = f"{s['name']}"
+            if s["has_update"]:
+                label += f" \033[33m(Update Available)\033[0m"
+            else:
+                label += f" \033[2m({s['status']})\033[0m"
+
+            options.append(
+                {
+                    "id": f"git:{s['name']}",
+                    "label": label,
+                    "checked": s["has_update"],  # Default check if update available
+                    "raw": (s["name"], s["path"], s["source_type"], "git"),
+                }
+            )
+
+    # npx Section
     if npx_skills:
-        print(f"\n   📦 npx skills (use 'npx skills update' to update):")
-        for (
-            name,
-            path,
-            source_type,
-            source_info,
-            has_update,
-            status_msg,
-            scope,
-        ) in npx_skills:
-            source_repo = source_info.get("source", "") if source_info else ""
-            print(f"   {idx}. {name:25} [{source_repo}]")
-            all_options.append((name, path, source_type, "npx"))
-            idx += 1
+        sections.append({"title": "npx Skills", "start_index": len(options)})
 
+        options.append(
+            {
+                "id": "__npx_update__",
+                "label": "Update all npx skills (via 'npx skills update')",
+                "checked": False,
+                "raw": ("__npx_update__", None, config.SOURCE_TYPE_NPX, "npx"),
+            }
+        )
+
+        for s in npx_skills:
+            options.append(
+                {
+                    "id": f"npx:{s['name']}",
+                    "label": f"{s['name']}",
+                    "checked": True,
+                    "disabled": True,  # Info only
+                }
+            )
+
+    # Local Section
     if local_skills:
-        print(f"\n   📁 Local skills (manual update required):")
-        for (
-            name,
-            path,
-            source_type,
-            source_info,
-            has_update,
-            status_msg,
-            scope,
-        ) in local_skills:
-            badge = get_scope_badge(scope)
-            print(f"   {idx}. {name:25} {badge} [Local directory]")
-            all_options.append((name, path, source_type, "local"))
-            idx += 1
+        sections.append({"title": "Local / Manual", "start_index": len(options)})
+        for s in local_skills:
+            options.append(
+                {
+                    "id": f"local:{s['name']}",
+                    "label": f"{s['name']} ({s['status']})",
+                    "checked": False,
+                    "disabled": True,
+                }
+            )
 
-    if unknown_skills:
-        print(f"\n   ❓ Unknown source:")
-        for (
-            name,
-            path,
-            source_type,
-            source_info,
-            has_update,
-            status_msg,
-            scope,
-        ) in unknown_skills:
-            badge = get_scope_badge(scope)
-            print(f"   {idx}. {name:25} {badge} [Unknown]")
-            all_options.append((name, path, source_type, "unknown"))
-            idx += 1
-
-    if not all_options:
+    if not options:
         print("   No skills found.")
         return []
 
-    print(f"\n   A. Update All Git-based skills")
-    print(f"   N. Run 'npx skills update' for npx skills")
+    menu = tui.MultiSelectMenu("Select skills to update", options, sections)
+    print("\033[2m  ↑↓ move, space select, enter confirm\033[0m")
 
-    choice = input(f"\nEnter choice (e.g. '1,2', 'A' for git, 'N' for npx): ").strip()
-
-    if not choice:
+    try:
+        selected_ids = menu.run()
+    except KeyboardInterrupt:
         return []
 
-    # Handle special cases
-    if choice.lower() == "a" or "all" in choice.lower():
-        return [
-            (name, path, st, method)
-            for name, path, st, method in all_options
-            if method == "git"
-        ]
+    # Map results
+    results = []
 
-    if choice.lower() == "n":
-        return [("__npx_update__", None, config.SOURCE_TYPE_NPX, "npx")]
+    # Helper to find raw data
+    results_map = {opt["id"]: opt.get("raw") for opt in options}
 
-    selected = []
+    for sid in selected_ids:
+        raw = results_map.get(sid)
+        if raw:
+            results.append(raw)
 
-    # Handle ranges and commas
-    parts = choice.split(",")
-    for part in parts:
-        part = part.strip()
-        if "-" in part:
-            try:
-                start, end = map(int, part.split("-"))
-                for i in range(start, end + 1):
-                    if 1 <= i <= len(all_options):
-                        selected.append(all_options[i - 1])
-            except ValueError:
-                pass
-        else:
-            try:
-                i = int(part)
-                if 1 <= i <= len(all_options):
-                    selected.append(all_options[i - 1])
-            except ValueError:
-                pass
-
-    return selected
+    return results
 
 
 def main():

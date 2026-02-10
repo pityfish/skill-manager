@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 List all skills in central repo and their sync status across all detected platforms.
-Shows installation source (npx skills vs Git/Local) and update status.
+Shows installation source (npx skills vs Git/Local), scope (Global/Project), and update status.
 """
 
 import json

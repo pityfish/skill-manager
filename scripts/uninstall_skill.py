@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 Uninstall a skill from central repo and/or selected platforms.
-Detects installation source and uses appropriate uninstall method:
-- npx skills: uses `npx skills remove -g`
+- npx skills: uses `npx skills remove` (with project/global flag)
 - Git/Local: removes files directly (central repo + all synced symlinks)
+- TUI Mode: provides a unified screen to select locations to clean up
 """
 
 import sys
@@ -225,74 +225,69 @@ def main():
             f"   Recommended: Use 'npx skills remove {skill_name}' (in project root) to uninstall."
         )
 
-    print("\n🗑️  Uninstall options:")
-
-    options = []
-
-    # Option 1: Context-aware default
-    if default_scope == "project":
-        options.append(("uninstall_project", f"Remove from Project only (Recommended)"))
-    elif default_scope == "global" and has_global:
-        options.append(("uninstall_global", f"Remove from Global only"))
-
-    # Option 2: The other scope if available
-    if default_scope == "project" and has_global:
-        options.append(("uninstall_global", "Remove from Global only"))
-    elif default_scope == "global" and has_project:
-        options.append(("uninstall_project", "Remove from Project only"))
-
-    # Option 3: All
-    if has_global and has_project:
-        options.append(("uninstall_all", "Remove Everywhere (Global + Project)"))
-
-    # Option 4: Selective
-    options.append(("selective", "Selective removal (choose specific locations)"))
-
-    # Option 5: Cancel
-    options.append(("cancel", "Cancel"))
-
-    # Display Options
-    for i, (opt_id, label) in enumerate(options, 1):
-        print(f"   {i}. {label}")
-
-    choice_idx = input(f"\nEnter choice [1]: ").strip()
-    if not choice_idx:
-        choice_idx = "1"
-
+    # Try to import TUI
+    sys.path.append(str(Path(__file__).parent))
     try:
-        idx = int(choice_idx) - 1
-        if idx < 0 or idx >= len(options):
-            raise ValueError
-        selected_opt = options[idx][0]
-    except ValueError:
-        print("❌ Invalid choice. Cancelled.")
-        sys.exit(0)
+        import tui
+    except ImportError:
+        tui = None
 
-    if selected_opt == "cancel":
-        print("❌ Uninstall cancelled.")
-        sys.exit(0)
-
-    keys_to_remove = []
-
-    if selected_opt == "uninstall_project":
-        keys_to_remove = [k for k, v in locations.items() if v["scope"] == "project"]
-    elif selected_opt == "uninstall_global":
-        keys_to_remove = [k for k, v in locations.items() if v["scope"] == "global"]
-    elif selected_opt == "uninstall_all":
+    if not tui:
+        print("\n⚠️  TUI module missing. Please use standard inputs.")
+        # Fallback: Select all locations for removal
         keys_to_remove = list(locations.keys())
-    elif selected_opt == "selective":
-        print("\nSelect locations to remove:")
-        loc_keys = list(locations.keys())
-        for i, key in enumerate(loc_keys, 1):
-            info = locations[key]
-            print(f"   {i}. {info['name']} ({info['scope']})")
+        print(f"   Selecting ALL locations for removal (fallback).")
+    else:
+        # Prepare TUI Options
+        options = []
+        sections = []
 
-        sel = input("Enter choices (e.g. 1,2): ").strip()
-        for s in sel.split(","):
-            if s.strip().isdigit():
-                k_idx = int(s.strip()) - 1
-                if 0 <= k_idx < len(loc_keys):
-                    keys_to_remove.append(loc_keys[k_idx])
+        # Group keys by scope
+        project_keys = [k for k, v in locations.items() if v["scope"] == "project"]
+        global_keys = [k for k, v in locations.items() if v["scope"] == "global"]
+
+        # Determine defaults
+        # If default is project, check project items.
+        # If default is global, check global items.
+        check_project = default_scope == "project"
+        check_global = default_scope == "global"
+
+        # Project Section
+        if project_keys:
+            sections.append({"title": "Project Scope", "start_index": len(options)})
+            for key in project_keys:
+                info = locations[key]
+                options.append(
+                    {
+                        "id": key,
+                        "label": f"{info['name']} ({info['path']})",
+                        "checked": check_project,
+                    }
+                )
+
+        # Global Section
+        if global_keys:
+            sections.append({"title": "Global Scope", "start_index": len(options)})
+            for key in global_keys:
+                info = locations[key]
+                options.append(
+                    {
+                        "id": key,
+                        "label": f"{info['name']} ({info['path']})",
+                        "checked": check_global,
+                    }
+                )
+
+        menu = tui.MultiSelectMenu(
+            "Select locations to uninstall from", options, sections
+        )
+        print("\033[2m  ↑↓ move, space select, enter confirm\033[0m")
+
+        try:
+            keys_to_remove = menu.run()
+        except KeyboardInterrupt:
+            print("\n❌ Cancelled.")
+            sys.exit(0)
 
     if not keys_to_remove:
         print("❌ No locations selected.")
