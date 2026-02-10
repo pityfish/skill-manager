@@ -348,14 +348,27 @@ def get_skill_source_type(skill_name: str, scope: str = "global") -> tuple[str, 
     """
     # Check npx skills lock first
     npx_lock = load_npx_skills_lock(scope)
-    if "skills" in npx_lock and skill_name in npx_lock["skills"]:
-        info = npx_lock["skills"][skill_name]
+    skills_in_lock = npx_lock.get("skills", {})
+
+    # 1. Direct match
+    if skill_name in skills_in_lock:
+        info = skills_in_lock[skill_name]
         return SOURCE_TYPE_NPX, {
             "source": info.get("source", ""),
             "source_url": info.get("sourceUrl", ""),
             "installed_at": info.get("installedAt", ""),
             "updated_at": info.get("updatedAt", ""),
         }
+
+    # 2. Suffix match (for names like org/repo@skill_name)
+    for full_id, info in skills_in_lock.items():
+        if "@" in full_id and full_id.split("@")[-1] == skill_name:
+            return SOURCE_TYPE_NPX, {
+                "source": info.get("source", ""),
+                "source_url": info.get("sourceUrl", ""),
+                "installed_at": info.get("installedAt", ""),
+                "updated_at": info.get("updatedAt", ""),
+            }
 
     # Check skill-manager metadata
     metadata = load_metadata(scope)
@@ -381,6 +394,11 @@ def ask_scope_tui(title: str = "Select scope") -> str:
     """Prompt user to select scope (Global or Project) using TUI."""
     import sys
     from pathlib import Path
+
+    # Optimization: If we are in the HOME directory and no project context was found,
+    # default to Global scope immediately without asking.
+    if PROJECT_ROOT.resolve() == Path.home().resolve():
+        return "global"
 
     try:
         import tui

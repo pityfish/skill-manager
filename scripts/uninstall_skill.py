@@ -315,33 +315,9 @@ def main():
         )
         print(f"   Uninstalling will automatically trigger 'npx skills remove'.")
 
-    # Try to import TUI for location selection
-    sys.path.append(str(Path(__file__).parent))
-    try:
-        import tui
-    except ImportError:
-        tui = None
-
-    if not tui:
-        keys_to_remove = list(final_locations.keys())
-    else:
-        options = []
-        for key, info in final_locations.items():
-            options.append(
-                {
-                    "id": key,
-                    "label": f"{info['name']} ({info['path']})",
-                    "checked": True,
-                }
-            )
-
-        menu = tui.MultiSelectMenu(
-            f"Confirm items to remove from {selected_scope} scope", options
-        )
-        try:
-            keys_to_remove = menu.run()
-        except KeyboardInterrupt:
-            sys.exit(0)
+    # If skill_name was provided via CLI, we skip the location selection TUI
+    # and just remove everything found in the selected scope.
+    keys_to_remove = list(final_locations.keys())
 
     if not keys_to_remove:
         print("❌ No locations selected.")
