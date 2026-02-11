@@ -1,6 +1,6 @@
 ---
 name: skill-manager
-description: Unified Agent Capability Manager. Use this to list installed skills, check your current capabilities, find and install new tools (npx/Git/Local), sync, update, or uninstall skills. It is your primary tool for managing and verifying your own toolset.
+description: Unified Agent Capability Manager. Use this skill to: 1) AUDIT and LIST your installed tools/capabilities. 2) FIND and INSTALL new skills (npx/Git/Local) to expand your toolset. 3) SYNC, UPDATE, or UNINSTALL existing skills across Global/Project scopes. Always use this first for self-correction or when you lack a required tool.
 ---
 
 # Agent Skill Manager (ASM)
