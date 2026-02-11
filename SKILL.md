@@ -23,7 +23,7 @@ npx skills find <search_query>
 
 **Mandatory Command**:
 ```bash
-python3 scripts/install_skill.py <skill_source>
+python3 <path_to_skill_manager>/scripts/install_skill.py <skill_source>
 ```
 *Note: This script will delegate to `npx` internally if needed and will handle the TUI scope prompt automatically.*
 
@@ -31,14 +31,14 @@ python3 scripts/install_skill.py <skill_source>
 **Usage**: List all installed skills, check current capabilities, and verify sync status.
 **Command**:
 ```bash
-python3 scripts/list_skills.py
+python3 <path_to_skill_manager>/scripts/list_skills.py
 ```
 
 ### 4. 🔄 Sync Skill
 **Usage**: Fix missing tools or sync to a new agent environment.
 **Command**:
 ```bash
-python3 scripts/sync_skill.py <skill_name>
+python3 <path_to_skill_manager>/scripts/sync_skill.py <skill_name>
 ```
 
 ### 5. 🆙 Update Skills
@@ -46,7 +46,7 @@ python3 scripts/sync_skill.py <skill_name>
 **Interactive Mode**: Run without arguments to see the TUI menu.
 **Command**:
 ```bash
-python3 scripts/update_skills.py
+python3 <path_to_skill_manager>/scripts/update_skills.py
 ```
 
 ### 6. 🗑️ Uninstall Skill
@@ -54,7 +54,7 @@ python3 scripts/update_skills.py
 **Interactive Mode (Preferred)**: Run **WITHOUT** arguments to enter a TUI-based selection menu across scopes.
 **Command**:
 ```bash
-python3 scripts/uninstall_skill.py
+python3 <path_to_skill_manager>/scripts/uninstall_skill.py
 ```
 
 ## 🧠 Agent Protocol
@@ -63,4 +63,8 @@ python3 scripts/uninstall_skill.py
 2.  **No Direct NPX Calls**: You **MUST NOT** call `npx skills add` or `npx skills remove` directly. Use the provided Python scripts (`install_skill.py`, `uninstall_skill.py`) for these actions. These scripts are wrappers that ensure correct Scope handling and Sync logic.
 3.  **Interaction First**: If the user gives a generic command like "uninstall skills" or "update tools", **DO NOT** ask for names or run `list_skills` first. Directly launch the corresponding script without arguments to provide the user with a TUI selection menu.
 4.  **No Assumptions**: Never decide the `scope` (Global/Project) or the specific `item` to uninstall. Use the interactive mode of the scripts to let the user decide.
-5.  **Verification**: Always use `python3 scripts/list_skills.py` to confirm the current state before making suggestions.
+5.  **Verification**: Always use `python3 <path_to_skill_manager>/scripts/list_skills.py` to confirm the current state before making suggestions.
+6.  **Context Awareness**: You **MUST** execute these scripts from the **User's Current Working Directory (Project Root)**. Do **NOT** `cd` into the `scripts/` folder or the `skill-manager` repository.
+7.  **Path Resolution**: The `skill-manager` might be installed Globally (`~/.agents/skills/skill-manager`) or Locally in the project (`.agents/skills/skill-manager`). You must **detect** where it is installed and execute the scripts using that path. Do not assume it is always global.
+    *   Example (Global): `python3 ~/.agents/skills/skill-manager/scripts/install_skill.py`
+    *   Example (Project): `python3 .agents/skills/skill-manager/scripts/install_skill.py`
