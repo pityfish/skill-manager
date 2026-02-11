@@ -244,12 +244,22 @@ def list_all_skills():
         if platforms_synced > 0:
             synced_count += 1
 
+    # Detect if we are in a purely global context (e.g. HOME directory)
+    # where Project Repo and Global Repo are effectively the same path.
+    is_global_only = False
+    try:
+        if config.SKILL_REPO_GLOBAL.resolve() == config.SKILL_REPO_PROJECT.resolve():
+            is_global_only = True
+    except Exception:
+        pass
+
     # Summary
     print("\n" + "=" * 80)
     print(f"\n📊 Summary:")
     print(f"   Total skills:     {len(all_skills)}")
     print(f"   Global Repo:      {in_repo_global}")
-    print(f"   Project Repo:     {in_repo_project}")
+    if not is_global_only:
+        print(f"   Project Repo:     {in_repo_project}")
     print(f"   Synced to 1+ platforms: {synced_count}")
 
     # Source type breakdown
@@ -280,12 +290,13 @@ def list_all_skills():
     print(f"\n📍 Available Platform Paths:")
     print(f"   Global Repo:   {config.SKILL_REPO_GLOBAL}")
 
-    if config.SKILL_REPO_PROJECT.exists():
-        print(f"   Project Repo:  {config.SKILL_REPO_PROJECT}")
-    else:
-        print(
-            f"   Project Repo:  (Not detected/created at {config.SKILL_REPO_PROJECT})"
-        )
+    if not is_global_only:
+        if config.SKILL_REPO_PROJECT.exists():
+            print(f"   Project Repo:  {config.SKILL_REPO_PROJECT}")
+        else:
+            print(
+                f"   Project Repo:  (Not detected/created at {config.SKILL_REPO_PROJECT})"
+            )
     for p_id, info in available_platforms.items():
         print(f"   {info['name']:15}: {info['path']}")
 
