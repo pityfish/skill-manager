@@ -1,11 +1,11 @@
 ---
 name: skill-manager
-description: The Skill Manager for AI Agents. Use this to find, install, sync, and manage skills.
+description: Unified Agent Capability Manager. Use this to list installed skills, check your current capabilities, find and install new tools (npx/Git/Local), sync, update, or uninstall skills. It is your primary tool for managing and verifying your own toolset.
 ---
 
 # Agent Skill Manager (ASM)
 
-This is your **primary tool** for managing your own capabilities.
+This is your **primary hub** for managing, auditing, and expanding your own functional capabilities. Whenever you or the user needs to know what tools are installed or want to add/remove a "skill", use this tool.
 
 ## 🛠️ Capabilities
 
@@ -28,7 +28,7 @@ python3 scripts/install_skill.py <skill_source>
 *Note: This script will delegate to `npx` internally if needed and will handle the TUI scope prompt automatically.*
 
 ### 3. 📋 List & Check Skills
-**Usage**: Check current capabilities and sync status.
+**Usage**: List all installed skills, check current capabilities, and verify sync status.
 **Command**:
 ```bash
 python3 scripts/list_skills.py
