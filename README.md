@@ -81,6 +81,8 @@ python3 scripts/install_skill.py browser-skill      # Community
 python3 scripts/install_skill.py https://github... # Git
 ```
 
+> 💡 **Smart Git Install**: When installing from a GitHub URL, the script automatically analyzes the repo structure. If the repo contains multiple skills in subdirectories, you'll be prompted to select which to install. If no `SKILL.md` is found, the README is printed for reference.
+
 **3. Sync & Update**
 ```bash
 # Interactive TUI (Select skills to update)

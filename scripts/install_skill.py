@@ -27,6 +27,128 @@ def get_skill_name_from_url(url: str) -> str:
     return name
 
 
+def analyze_repo_structure(cloned_path: Path) -> dict:
+    """
+    分析 clone 后的 repo 结构，检测 skill 目录和安装说明。
+    返回: {
+        "type": "single" | "multi" | "no_skill",
+        "skill_roots": [Path, ...],      # 包含 SKILL.md 的目录列表
+        "readmes": [Path, ...],           # README 文件列表
+        "root_has_skill": bool,           # 根目录是否有 SKILL.md
+    }
+    """
+    skill_roots = []
+    readmes = []
+
+    # 使用 os.walk 搜索 SKILL.md（高效跳过 .git 和 node_modules 目录）
+    for dirpath, dirnames, filenames in os.walk(cloned_path):
+        # 就地修改 dirnames 以跳过不需要遍历的目录
+        dirnames[:] = [
+            d for d in dirnames if d not in (".git", "node_modules", "__pycache__")
+        ]
+        if "SKILL.md" in filenames:
+            skill_roots.append(Path(dirpath))
+
+    # 收集 README 文件（仅根目录和一级子目录）
+    for readme_name in ["README.md", "README_CN.md", "README.rst", "readme.md"]:
+        root_readme = cloned_path / readme_name
+        if root_readme.exists():
+            readmes.append(root_readme)
+
+    root_has_skill = cloned_path in skill_roots
+
+    if root_has_skill:
+        repo_type = "single"
+    elif skill_roots:
+        repo_type = "multi"
+    else:
+        repo_type = "no_skill"
+
+    return {
+        "type": repo_type,
+        "skill_roots": skill_roots,
+        "readmes": readmes,
+        "root_has_skill": root_has_skill,
+    }
+
+
+def print_readme_content(readme_path: Path, max_lines: int = 100):
+    """输出 README 内容供 Agent 阅读。"""
+    print(f"\n{'='*60}")
+    print(f"📖 Repository README: {readme_path.name}")
+    print(f"{'='*60}\n")
+    try:
+        content = readme_path.read_text(encoding="utf-8")
+        lines = content.splitlines()
+        if len(lines) > max_lines:
+            print("\n".join(lines[:max_lines]))
+            print(f"\n... (截断，共 {len(lines)} 行，已显示前 {max_lines} 行)")
+        else:
+            print(content)
+    except Exception as e:
+        print(f"❌ 无法读取 README: {e}")
+    print(f"\n{'='*60}")
+
+
+def ask_skill_selection(skill_roots: list[Path], cloned_path: Path) -> list[Path]:
+    """通过 TUI 让用户选择要安装的 skill 子目录。"""
+    # 导入 TUI
+    try:
+        import tui
+    except ImportError:
+        sys.path.append(str(Path(__file__).parent))
+        try:
+            import tui
+        except ImportError:
+            tui = None
+
+    if not tui or len(skill_roots) == 1:
+        # 无 TUI 或仅一个 skill，直接返回
+        return skill_roots
+
+    options = []
+    for root in sorted(skill_roots, key=lambda p: str(p)):
+        try:
+            rel_path = root.relative_to(cloned_path)
+        except ValueError:
+            rel_path = root
+
+        # 尝试从 SKILL.md 的 frontmatter 读取名称和描述
+        skill_md = root / "SKILL.md"
+        skill_label = str(rel_path)
+        try:
+            content = skill_md.read_text(encoding="utf-8")
+            # 简易解析 YAML frontmatter 中的 name 和 description
+            if content.startswith("---"):
+                end = content.index("---", 3)
+                frontmatter = content[3:end]
+                for line in frontmatter.splitlines():
+                    line = line.strip()
+                    if line.startswith("name:"):
+                        name = line[5:].strip().strip('"').strip("'")
+                        skill_label = f"{name} ({rel_path})"
+                        break
+        except Exception:
+            pass
+
+        options.append(
+            {
+                "id": str(root),
+                "label": skill_label,
+                "checked": True,
+            }
+        )
+
+    menu = tui.MultiSelectMenu("Repo 中包含多个 Skills，请选择要安装的:", options)
+    try:
+        selected_ids = menu.run()
+    except KeyboardInterrupt:
+        print("\n❌ Cancelled.")
+        sys.exit(0)
+
+    return [Path(sid) for sid in selected_ids]
+
+
 def clone_git_repo(url: str, target_dir: Path) -> Path:
     """Clone a git repository to a target directory."""
     print(f"   ⬇️  Cloning from {url}...")
@@ -362,6 +484,7 @@ def update_sync_metadata(
     scope: str = "global",
     source_type: str = "unknown",
     source_url: Optional[str] = None,
+    source_subdir: Optional[str] = None,
 ):
     """Update metadata file with sync information."""
     metadata = config.load_metadata(scope)
@@ -390,9 +513,67 @@ def update_sync_metadata(
         "source": str(repo_path / skill_name),
         "source_type": source_type,
         "source_url": source_url,
+        "source_subdir": source_subdir,
         "targets": valid_targets,
     }
     config.save_metadata(metadata, scope)
+
+
+def _install_single_skill(
+    source_path: Path,
+    skill_name: str,
+    scope: str,
+    is_git: bool = False,
+    source_url: Optional[str] = None,
+    source_subdir: Optional[str] = None,
+):
+    """
+    安装单个 skill 的完整流程（从 conflict 检查到 sync）。
+    提取为独立函数以支持多 skill repo 的逐个安装。
+    """
+    available_platforms = get_platform_paths(scope)
+    repo_path_root = config.get_skill_repo(scope)
+
+    # 冲突检测
+    conflicts = check_conflicts(skill_name, available_platforms, scope)
+    force = False
+    if conflicts:
+        if not ask_user_overwrite(conflicts):
+            print(f"   ⏭️  Skipping '{skill_name}'.")
+            return
+        force = True
+
+    # 安装到 Repo
+    print(f"   📥 Installing to '{scope}' Repo ({repo_path_root})...")
+    repo_path = install_to_repo(
+        source_path, skill_name, scope=scope, force=force, is_git=is_git
+    )
+    print(f"   ✅ Stored at: {repo_path}")
+
+    # 选择同步目标
+    sync_targets = ask_sync_targets(available_platforms, scope == "project")
+
+    # 同步到平台
+    sync_to_platforms(repo_path, skill_name, sync_targets, available_platforms, force)
+
+    # 更新 metadata
+    final_source_type = config.SOURCE_TYPE_LOCAL
+    if is_git:
+        final_source_type = config.SOURCE_TYPE_GIT
+    elif (repo_path / ".git").exists():
+        final_source_type = config.SOURCE_TYPE_GIT
+
+    update_sync_metadata(
+        skill_name,
+        sync_targets,
+        available_platforms,
+        scope=scope,
+        source_type=final_source_type,
+        source_url=source_url,
+        source_subdir=source_subdir,
+    )
+
+    print(f"   ✅ Skill '{skill_name}' setup complete!")
 
 
 def main():
@@ -447,11 +628,99 @@ def main():
             skill_name = get_skill_name_from_url(source_input)
             print(f"📦 Detected Git URL for skill: {skill_name}")
 
-            # Determine strict source path (temp or direct to repo?)
-            # To handle conflicts properly, let's clone to a temp dir first
+            # Clone 到临时目录
             temp_dir = tempfile.mkdtemp()
-            # The clone will create the subdir inside temp_dir
-            source_path = clone_git_repo(source_input, Path(temp_dir) / skill_name)
+            cloned_path = clone_git_repo(source_input, Path(temp_dir) / skill_name)
+
+            # === Repo 结构分析阶段 ===
+            print("\n🔍 Analyzing repository structure...")
+            analysis = analyze_repo_structure(cloned_path)
+
+            if analysis["type"] == "single":
+                # 纯 skill repo：根目录就是 SKILL.md，保持原有行为
+                print(f"   ✅ Pure skill repo detected (root SKILL.md found).")
+                source_path = cloned_path
+
+            elif analysis["type"] == "multi":
+                # 多 skill repo：子目录中有 SKILL.md
+                print(
+                    f"   📦 Found {len(analysis['skill_roots'])} skill(s) in subdirectories:"
+                )
+                for root in analysis["skill_roots"]:
+                    try:
+                        rel = root.relative_to(cloned_path)
+                    except ValueError:
+                        rel = root
+                    print(f"      - {rel}/")
+
+                # 如果 repo 有 README，也输出提示
+                if analysis["readmes"]:
+                    print_readme_content(analysis["readmes"][0])
+
+                # 让用户选择要安装的 skill
+                selected = ask_skill_selection(analysis["skill_roots"], cloned_path)
+
+                if not selected:
+                    print("\n❌ No skills selected. Installation cancelled.")
+                    sys.exit(0)
+
+                # 多 skill 逐个安装
+                if len(selected) >= 1:
+                    for i, skill_dir in enumerate(selected):
+                        sub_skill_name = skill_dir.name
+                        print(f"\n{'─'*40}")
+                        print(
+                            f"📦 [{i+1}/{len(selected)}] Installing skill: {sub_skill_name}"
+                        )
+
+                        # 计算子目录相对路径，供更新时使用
+                        try:
+                            subdir_rel = str(skill_dir.relative_to(cloned_path))
+                        except ValueError:
+                            subdir_rel = sub_skill_name
+
+                        # 调用单个 skill 的安装流程
+                        _install_single_skill(
+                            source_path=skill_dir,
+                            skill_name=sub_skill_name,
+                            scope=args.scope,
+                            is_git=True,
+                            source_url=source_input,
+                            source_subdir=subdir_rel,
+                        )
+                    print(f"\n✅ All {len(selected)} skill(s) installed!")
+                    return  # 多 skill 安装完毕，直接返回
+
+            else:
+                # 无 SKILL.md 结构：输出 README 供 Agent/用户阅读
+                print(f"   ⚠️  No SKILL.md found in this repository.")
+
+                if analysis["readmes"]:
+                    print(f"   📖 Printing README for reference...")
+                    print_readme_content(analysis["readmes"][0])
+                    print(f"\n💡 Tip: This repo may require manual setup.")
+                    print(
+                        f"   Please read the README above for installation instructions."
+                    )
+                    print(f"   Cloned to: {cloned_path}")
+                else:
+                    print(f"   ❌ No README found either.")
+                    print(f"   Cloned to: {cloned_path}")
+
+                # 询问用户是否仍要强制安装整个 repo 作为 skill
+                response = (
+                    input("\n⚠️  Force install the entire repo as a skill? [y/N]: ")
+                    .strip()
+                    .lower()
+                )
+                if response != "y":
+                    print("\n❌ Installation cancelled. Repo is preserved at:")
+                    print(f"   {cloned_path}")
+                    temp_dir = None  # 不清理临时目录，保留给用户
+                    sys.exit(0)
+
+                source_path = cloned_path
+
         else:
             source_path = Path(source_input).resolve()
             if not source_path.exists():
@@ -504,61 +773,14 @@ def main():
             print(f"   - To update code: python3 scripts/update_skills.py")
             sys.exit(0)
 
-        # Determine target platforms (Global vs Local)
-        available_platforms = get_platform_paths(args.scope)
-        repo_path_root = config.get_skill_repo(args.scope)
-
-        # Check for conflicts
-        conflicts = check_conflicts(skill_name, available_platforms, args.scope)
-        force = False
-
-        # Filter out self-conflicts if reinstalling from repo
-        if not is_git and source_path == repo_path_root / skill_name:
-            conflicts.pop("repo", None)
-
-        if conflicts:
-            if not ask_user_overwrite(conflicts):
-                print("\n❌ Installation cancelled.")
-                sys.exit(0)
-            force = True
-
-        # Install to Central Repo
-        print(f"\n📥 Installing to '{args.scope}' Repo ({repo_path_root})...")
-        repo_path = install_to_repo(
-            source_path, skill_name, scope=args.scope, force=force, is_git=is_git
-        )
-        print(f"   ✅ Stored at: {repo_path}")
-
-        # Ask user which platforms to sync
-        sync_targets = ask_sync_targets(available_platforms, args.scope == "project")
-
-        # Sync to platforms
-        sync_to_platforms(
-            repo_path, skill_name, sync_targets, available_platforms, force
-        )
-
-        # Update metadata
-        # Detect if it's a local git repo even if installed from path
-        final_source_type = config.SOURCE_TYPE_LOCAL
-        if is_npx:
-            final_source_type = config.SOURCE_TYPE_NPX
-        elif is_git:
-            final_source_type = config.SOURCE_TYPE_GIT
-        elif (repo_path / ".git").exists():
-            # If we copied a .git folder, it's a git repo
-            final_source_type = config.SOURCE_TYPE_GIT
-            print(f"   ℹ️  Marked as Git repository (updates enabled).")
-
-        update_sync_metadata(
-            skill_name,
-            sync_targets,
-            available_platforms,
+        # 统一调用安装流程
+        _install_single_skill(
+            source_path=source_path,
+            skill_name=skill_name,
             scope=args.scope,
-            source_type=final_source_type,
+            is_git=is_git,
             source_url=source_input,
         )
-
-        print(f"\n✅ Skill '{skill_name}' setup complete!")
 
     finally:
         # Cleanup temp if used

@@ -68,3 +68,8 @@ python3 <path_to_skill_manager>/scripts/uninstall_skill.py
 7.  **Path Resolution**: The `skill-manager` might be installed Globally (`~/.agents/skills/skill-manager`) or Locally in the project (`.agents/skills/skill-manager`). You must **detect** where it is installed and execute the scripts using that path. Do not assume it is always global.
     *   Example (Global): `python3 ~/.agents/skills/skill-manager/scripts/install_skill.py`
     *   Example (Project): `python3 .agents/skills/skill-manager/scripts/install_skill.py`
+8.  **GitHub Pre-Check Protocol**: When installing from a GitHub URL, `install_skill.py` will automatically analyze the repo structure after cloning:
+    *   **Root `SKILL.md` found**: Proceeds with normal installation (pure skill repo).
+    *   **Sub-directory `SKILL.md`(s) found**: Presents a selection menu. Review the output and assist the user.
+    *   **No `SKILL.md` found**: The script will print the repo's **README** content. You **MUST carefully read** this output, understand the repo's installation instructions, and then guide the user accordingly. **Do NOT force-install** the entire repo unless the user explicitly confirms.
+

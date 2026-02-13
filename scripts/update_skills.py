@@ -135,6 +135,62 @@ def update_npx_skill(skill_name: str) -> str:
         return "error: npx not found"
 
 
+def update_git_subdir_skill(
+    skill_path: Path, source_url: str, source_subdir: str
+) -> str:
+    """
+    更新从多 skill repo 子目录安装的 skill。
+    通过重新 clone 整个 repo，提取指定子目录来更新。
+    """
+    import tempfile
+    import shutil
+
+    temp_dir = None
+    try:
+        temp_dir = tempfile.mkdtemp()
+        temp_clone = Path(temp_dir) / "repo"
+
+        # Clone 整个 repo
+        subprocess.run(
+            ["git", "clone", "--depth", "1", source_url, str(temp_clone)],
+            check=True,
+            capture_output=True,
+            timeout=60,
+        )
+
+        # 检查子目录是否存在
+        subdir_path = temp_clone / source_subdir
+        if not subdir_path.exists():
+            return f"error: subdir '{source_subdir}' not found in cloned repo"
+
+        # 替换现有 skill 目录（保留 .git 目录如果有的话）
+        if skill_path.exists():
+            shutil.rmtree(skill_path)
+        shutil.copytree(subdir_path, skill_path)
+
+        return "updated"
+
+    except subprocess.CalledProcessError as e:
+        return f"error: git clone failed - {e.stderr.decode().strip() if e.stderr else str(e)}"
+    except subprocess.TimeoutExpired:
+        return "error: timeout during clone"
+    except Exception as e:
+        return f"error: {str(e)}"
+    finally:
+        if temp_dir and os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+
+
+def check_subdir_updates_available(
+    source_url: str, skill_path: Path, source_subdir: str
+) -> tuple[bool, str]:
+    """
+    检查子目录类型 skill 是否有可用更新。
+    由于子目录没有 .git，无法精确检测，显示提示信息。
+    """
+    return True, f"📦 Subdir: {source_subdir}"
+
+
 def get_all_updatable_skills(scope: str = None):
     """
     Return a list of (skill_name, path, source_type, source_info, scope) for updatable skills.
@@ -176,11 +232,27 @@ def ask_skills_to_update(skills, selected_scope: str):
 
     print("\n📦 Checking for updates (parallel)...")
 
-    # Run git checks in parallel for git-based skills
+    # Run checks in parallel for git-based skills
     git_futures = {}
+    subdir_skills_info = {}  # 子目录类型 skill 的信息
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for name, path, source_type, source_info, scope in skills:
-            if source_type == config.SOURCE_TYPE_GIT or (path / ".git").exists():
+            source_subdir = (
+                source_info.get("source_subdir")
+                if isinstance(source_info, dict)
+                else None
+            )
+            if source_subdir and source_type == config.SOURCE_TYPE_GIT:
+                # 子目录类型：无法用 git fetch 检查，但标记为可更新
+                source_url = source_info.get("source_url", "")
+                subdir_skills_info[name] = {
+                    "source_url": source_url,
+                    "source_subdir": source_subdir,
+                }
+                git_futures[name] = executor.submit(
+                    check_subdir_updates_available, source_url, path, source_subdir
+                )
+            elif source_type == config.SOURCE_TYPE_GIT or (path / ".git").exists():
                 git_futures[name] = executor.submit(check_updates_available, path)
 
     # Prepare data for TUI
@@ -239,7 +311,12 @@ def ask_skills_to_update(skills, selected_scope: str):
                     "id": f"git:{s['name']}",
                     "label": label,
                     "checked": s["has_update"],  # Default check if update available
-                    "raw": (s["name"], s["path"], s["source_type"], "git"),
+                    "raw": (
+                        s["name"],
+                        s["path"],
+                        s["source_type"],
+                        "git_subdir" if s["name"] in subdir_skills_info else "git",
+                    ),
                 }
             )
 
@@ -408,7 +485,19 @@ def main():
                 print(f"📁 Skill '{name}' is a local skill (no git repo).")
                 print(f"   Manual update required.")
                 continue
-            elif get_git_repo_status(path) != "git":
+
+            # 检查是否是子目录类型的 git skill
+            source_info = selected_info.get("source_info", {})
+            source_subdir = (
+                source_info.get("source_subdir")
+                if isinstance(source_info, dict)
+                else None
+            )
+            if source_subdir and source_type == config.SOURCE_TYPE_GIT:
+                targets.append((name, path, source_type, "git_subdir"))
+                continue
+
+            if get_git_repo_status(path) != "git":
                 print(f"⚠️  Skill '{name}' is not a git repository.")
                 continue
 
@@ -417,7 +506,14 @@ def main():
     elif args.all:
         all_skills = get_all_updatable_skills()
         for name, path, source_type, source_info, scope in all_skills:
-            if source_type == config.SOURCE_TYPE_GIT or (path / ".git").exists():
+            source_subdir = (
+                source_info.get("source_subdir")
+                if isinstance(source_info, dict)
+                else None
+            )
+            if source_subdir and source_type == config.SOURCE_TYPE_GIT:
+                targets.append((name, path, source_type, "git_subdir"))
+            elif source_type == config.SOURCE_TYPE_GIT or (path / ".git").exists():
                 targets.append((name, path, source_type, "git"))
 
     # 3. Interactive mode (only if no flags set)
@@ -492,8 +588,10 @@ def main():
 
         return
 
-    # Filter to only git-updatable skills
-    git_targets = [(n, p, st, m) for n, p, st, m in targets if m == "git"]
+    # Filter to git-updatable and subdir-updatable skills
+    git_targets = [
+        (n, p, st, m) for n, p, st, m in targets if m in ("git", "git_subdir")
+    ]
 
     if not git_targets:
         print("\n⚠️  No Git-based skills selected for update.")
@@ -506,7 +604,22 @@ def main():
     updated_count = 0
 
     for name, path, source_type, method in git_targets:
-        result = update_git_repo(path)
+        if method == "git_subdir":
+            # 子目录类型：需要从 metadata 获取 source_url 和 source_subdir
+            skill_meta = config.load_metadata().get(name, {})
+            # 也检查 project scope
+            if not skill_meta:
+                skill_meta = config.load_metadata("project").get(name, {})
+            source_url = skill_meta.get("source_url", "")
+            source_subdir = skill_meta.get("source_subdir", "")
+            if not source_url or not source_subdir:
+                print(
+                    f"   ❌ {name:25} [Missing source_url or source_subdir in metadata]"
+                )
+                continue
+            result = update_git_subdir_skill(path, source_url, source_subdir)
+        else:
+            result = update_git_repo(path)
 
         if result == "up_to_date":
             print(f"   ✅ {name:25} [Up to date]")

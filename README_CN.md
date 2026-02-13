@@ -83,6 +83,8 @@ python3 scripts/install_skill.py browser-skill      # 社区技能
 python3 scripts/install_skill.py https://github... # Git 技能
 ```
 
+> 💡 **智能 Git 安装**：从 GitHub URL 安装时，脚本会自动分析 repo 结构。如果 repo 包含多个子目录 skill，会弹出选择菜单；如果找不到 `SKILL.md`，会打印 README 供参考。
+
 **3. 同步与更新**
 ```bash
 # 交互式更新 (TUI 按需勾选)
