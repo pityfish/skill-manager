@@ -333,13 +333,16 @@ def ask_skills_to_update(skills, selected_scope: str):
     options = []
     sections = []
 
-    # Git Section
-    if git_skills:
-        sections.append({"title": "Git Repositories", "start_index": len(options)})
-        # Sort by update availability first, then name
-        git_skills.sort(key=lambda x: (not x["has_update"], x["name"]))
+    # Filter Git Skills (Only show updates)
+    updatable_git_skills = [s for s in git_skills if s["has_update"]]
 
-        for s in git_skills:
+    # Git Section
+    if updatable_git_skills:
+        sections.append({"title": "Git Repositories", "start_index": len(options)})
+        # Sort by name (since all have update available)
+        updatable_git_skills.sort(key=lambda x: x["name"])
+
+        for s in updatable_git_skills:
             label = f"{s['name']}"
             if s["has_update"]:
                 label += f" \033[33m(Update Available)\033[0m"
@@ -398,7 +401,7 @@ def ask_skills_to_update(skills, selected_scope: str):
             )
 
     if not options:
-        print("   No skills found.")
+        print("\n✅ All tracked skills are up to date!")
         return []
 
     menu = tui.MultiSelectMenu(title, options, sections)
