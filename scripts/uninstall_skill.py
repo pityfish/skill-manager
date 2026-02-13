@@ -240,6 +240,40 @@ def uninstall_skill_selective(
         print(f"\n⚠️  Nothing was removed.")
 
 
+def select_locations_to_uninstall(
+    skill_name: str, locations: dict, scope: str
+) -> list[str]:
+    """Ask user which locations to uninstall from."""
+    # Import tui here to ensure it's available
+    try:
+        import tui
+    except ImportError:
+        # Fallback to all if tui missing
+        return list(locations.keys())
+
+    options = []
+    # Sort for consistent display
+    for key, info in sorted(locations.items()):
+        path = info["path"]
+        type_str = "Symlink" if info["is_symlink"] else "Repo"
+        label = f"{type_str}: {path}"
+        options.append(
+            {
+                "id": key,
+                "label": label,
+                "checked": True,  # Default to all checked
+            }
+        )
+
+    menu = tui.MultiSelectMenu(
+        f"Select locations to remove for '{skill_name}' ({scope})", options
+    )
+    try:
+        return menu.run()
+    except KeyboardInterrupt:
+        return []
+
+
 def main():
     skill_name = sys.argv[1] if len(sys.argv) > 1 else None
 
@@ -267,10 +301,16 @@ def main():
                 )
                 continue
 
-            # In this fully interactive mode, we take all locations in that scope (repo + agents)
-            uninstall_skill_selective(
-                name, list(scope_locations.keys()), scope_locations
+            # NEW: Ask which locations to remove
+            keys_to_remove = select_locations_to_uninstall(
+                name, scope_locations, selected_scope
             )
+
+            if not keys_to_remove:
+                print(f"⏩ Skipping '{name}' (no locations selected).")
+                continue
+
+            uninstall_skill_selective(name, keys_to_remove, scope_locations)
         return
 
     # Case 2: Specified skill name via CLI
@@ -315,20 +355,13 @@ def main():
         )
         print(f"   Uninstalling will automatically trigger 'npx skills remove'.")
 
-    # If skill_name was provided via CLI, we skip the location selection TUI
-    # and just remove everything found in the selected scope.
-    keys_to_remove = list(final_locations.keys())
+    # NEW: Ask which locations to remove
+    keys_to_remove = select_locations_to_uninstall(
+        skill_name, final_locations, selected_scope
+    )
 
     if not keys_to_remove:
-        print("❌ No locations selected.")
-        return
-
-    # Confirmation
-    print(
-        f"\n⚠️  Will remove {len(keys_to_remove)} item(s) from {selected_scope} scope."
-    )
-    if input("Confirm? [y/N]: ").strip().lower() != "y":
-        print("❌ Cancelled.")
+        print("❌ No locations selected/Cancelled.")
         return
 
     uninstall_skill_selective(skill_name, keys_to_remove, final_locations)
