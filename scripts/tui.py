@@ -2,6 +2,7 @@
 import sys
 import tty
 import termios
+import shutil
 
 
 class MultiSelectMenu:
@@ -43,6 +44,15 @@ class MultiSelectMenu:
         prev_lines = []
 
         while True:
+            # Get terminal size
+            try:
+                cols, _ = shutil.get_terminal_size()
+            except Exception:
+                cols = 80
+
+            # Safety margin
+            width = max(20, cols - 1)
+
             # 1. Build Content Buffer (Options + Sections)
             content_lines = []
             option_line_map = {}  # map option index -> line index in content_lines
@@ -52,9 +62,14 @@ class MultiSelectMenu:
                 for sec in self.sections:
                     if sec["start_index"] == i:
                         content_lines.append("")
-                        content_lines.append(
-                            f"\033[1m  ── {sec['title']} ──────────────────────────────\033[0m"
+                        # Truncate title line if needed (simple approximation)
+                        raw_title = (
+                            f"  ── {sec['title']} ──────────────────────────────"
                         )
+                        if len(raw_title) > width:
+                            raw_title = raw_title[:width]
+
+                        content_lines.append(f"\033[1m{raw_title}\033[0m")
 
                 # Track where this option is printed
                 line_idx = len(content_lines)
@@ -77,6 +92,15 @@ class MultiSelectMenu:
                 reset = "\033[0m"
 
                 label = opt["label"]
+
+                # Truncate label to fit screen
+                # Prefix takes about 7 chars: "   ○ " or " ❯ ● "
+                prefix_len = 7
+                avail_label = max(5, width - prefix_len - 2)  # -2 safety
+
+                if len(label) > avail_label:
+                    label = label[: avail_label - 3] + "..."
+
                 if is_selected:
                     line = f"{color} {marker} {checkbox} {label}{reset}"
                 else:
@@ -124,26 +148,19 @@ class MultiSelectMenu:
             else:
                 footer = "\033[2m  ↑↓ move, space select, enter confirm\033[0m"
 
-            # Fill empty space if list is short?
-            # No, just print what we have.
-            # But if we clear previous output, we need to be consistent?
-            # The viewport height might vary if content < max_height.
-            # Let's pad to max_height to keep footer stable?
-            # It's better for UX if the menu doesn't jump in height (though content won't shrink usually)
-            # Actually, if list is short, max_height is irrelevant.
-            # But if filtering reduced items... we don't filter yet.
-
             buffer.append("")
             buffer.append(footer)
 
             # Clear previous output
             if not first_draw:
                 # Move up N lines
-                # N = len(prev_lines)
-                sys.stdout.write(f"\033[{len(prev_lines)}A")  # Move up
-                sys.stdout.write("\033[J")  # Clear below
+                if prev_lines:
+                    sys.stdout.write(f"\033[{len(prev_lines)}A")  # Move up
+                    sys.stdout.write("\033[J")  # Clear below
 
             # Print
+            # Using sys.stdout.write to verify exact line control?
+            # But print is fine if we count correctly.
             print("\n".join(buffer))
             prev_lines = buffer
             first_draw = False
