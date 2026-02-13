@@ -485,6 +485,7 @@ def update_sync_metadata(
     source_type: str = "unknown",
     source_url: Optional[str] = None,
     source_subdir: Optional[str] = None,
+    commit_hash: Optional[str] = None,
 ):
     """Update metadata file with sync information."""
     metadata = config.load_metadata(scope)
@@ -514,6 +515,7 @@ def update_sync_metadata(
         "source_type": source_type,
         "source_url": source_url,
         "source_subdir": source_subdir,
+        "commit_hash": commit_hash,
         "targets": valid_targets,
     }
     config.save_metadata(metadata, scope)
@@ -526,6 +528,7 @@ def _install_single_skill(
     is_git: bool = False,
     source_url: Optional[str] = None,
     source_subdir: Optional[str] = None,
+    commit_hash: Optional[str] = None,
 ):
     """
     安装单个 skill 的完整流程（从 conflict 检查到 sync）。
@@ -571,6 +574,7 @@ def _install_single_skill(
         source_type=final_source_type,
         source_url=source_url,
         source_subdir=source_subdir,
+        commit_hash=commit_hash,
     )
 
     print(f"   ✅ Skill '{skill_name}' setup complete!")
@@ -632,6 +636,18 @@ def main():
             temp_dir = tempfile.mkdtemp()
             cloned_path = clone_git_repo(source_input, Path(temp_dir) / skill_name)
 
+            # 获取当前 Commit Hash
+            try:
+                current_hash = subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    cwd=str(cloned_path),
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ).stdout.strip()
+            except Exception:
+                current_hash = None
+
             # === Repo 结构分析阶段 ===
             print("\n🔍 Analyzing repository structure...")
             analysis = analyze_repo_structure(cloned_path)
@@ -687,6 +703,7 @@ def main():
                             is_git=True,
                             source_url=source_input,
                             source_subdir=subdir_rel,
+                            commit_hash=current_hash,
                         )
                     print(f"\n✅ All {len(selected)} skill(s) installed!")
                     return  # 多 skill 安装完毕，直接返回

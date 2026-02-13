@@ -137,10 +137,11 @@ def update_npx_skill(skill_name: str) -> str:
 
 def update_git_subdir_skill(
     skill_path: Path, source_url: str, source_subdir: str
-) -> str:
+) -> tuple[str, str]:
     """
     更新从多 skill repo 子目录安装的 skill。
     通过重新 clone 整个 repo，提取指定子目录来更新。
+    返回: (status, new_commit_hash)
     """
     import tempfile
     import shutil
@@ -158,37 +159,70 @@ def update_git_subdir_skill(
             timeout=60,
         )
 
+        # 获取新的 commit hash
+        new_hash = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(temp_clone),
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
         # 检查子目录是否存在
         subdir_path = temp_clone / source_subdir
         if not subdir_path.exists():
-            return f"error: subdir '{source_subdir}' not found in cloned repo"
+            return f"error: subdir '{source_subdir}' not found in cloned repo", ""
 
         # 替换现有 skill 目录（保留 .git 目录如果有的话）
         if skill_path.exists():
             shutil.rmtree(skill_path)
         shutil.copytree(subdir_path, skill_path)
 
-        return "updated"
+        return "updated", new_hash
 
     except subprocess.CalledProcessError as e:
-        return f"error: git clone failed - {e.stderr.decode().strip() if e.stderr else str(e)}"
+        return (
+            f"error: git clone failed - {e.stderr.decode().strip() if e.stderr else str(e)}",
+            "",
+        )
     except subprocess.TimeoutExpired:
-        return "error: timeout during clone"
+        return "error: timeout during clone", ""
     except Exception as e:
-        return f"error: {str(e)}"
+        return f"error: {str(e)}", ""
     finally:
         if temp_dir and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
 
 
 def check_subdir_updates_available(
-    source_url: str, skill_path: Path, source_subdir: str
+    source_url: str, skill_path: Path, source_subdir: str, local_hash: str = None
 ) -> tuple[bool, str]:
     """
     检查子目录类型 skill 是否有可用更新。
-    由于子目录没有 .git，无法精确检测，显示提示信息。
+    对比远程 HEAD hash 和本地 metadata 中的 hash。
     """
-    return True, f"📦 Subdir: {source_subdir}"
+    try:
+        # 获取远程 HEAD hash
+        remote_output = subprocess.run(
+            ["git", "ls-remote", source_url, "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        ).stdout.strip()
+
+        if not remote_output:
+            return False, "Unknown remote"
+
+        remote_hash = remote_output.split()[0]
+
+        if local_hash and remote_hash == local_hash:
+            return False, "Up to date"
+
+        return True, f"📦 Update available ({remote_hash[:7]})"
+
+    except Exception as e:
+        return True, f"📦 Check failed (assuming update avail)"
 
 
 def get_all_updatable_skills(scope: str = None):
@@ -245,12 +279,18 @@ def ask_skills_to_update(skills, selected_scope: str):
             if source_subdir and source_type == config.SOURCE_TYPE_GIT:
                 # 子目录类型：无法用 git fetch 检查，但标记为可更新
                 source_url = source_info.get("source_url", "")
+                commit_hash = source_info.get("commit_hash", None)
                 subdir_skills_info[name] = {
                     "source_url": source_url,
                     "source_subdir": source_subdir,
+                    "commit_hash": commit_hash,
                 }
                 git_futures[name] = executor.submit(
-                    check_subdir_updates_available, source_url, path, source_subdir
+                    check_subdir_updates_available,
+                    source_url,
+                    path,
+                    source_subdir,
+                    commit_hash,
                 )
             elif source_type == config.SOURCE_TYPE_GIT or (path / ".git").exists():
                 git_futures[name] = executor.submit(check_updates_available, path)
@@ -617,7 +657,23 @@ def main():
                     f"   ❌ {name:25} [Missing source_url or source_subdir in metadata]"
                 )
                 continue
-            result = update_git_subdir_skill(path, source_url, source_subdir)
+
+            # 执行更新
+            result, new_hash = update_git_subdir_skill(path, source_url, source_subdir)
+
+            # 如果更新成功且有新 hash，更新 metadata
+            if result == "updated" and new_hash:
+                skill_meta["commit_hash"] = new_hash
+                # 保存 metadata (需判断是 global 还是 project)
+                # 重新加载确定 scope
+                target_scope = "global"
+                if config.load_metadata("project").get(name):
+                    target_scope = "project"
+
+                md = config.load_metadata(target_scope)
+                if name in md:
+                    md[name]["commit_hash"] = new_hash
+                    config.save_metadata(md, target_scope)
         else:
             result = update_git_repo(path)
 

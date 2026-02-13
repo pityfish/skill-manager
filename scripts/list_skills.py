@@ -73,6 +73,41 @@ def check_git_remote_status(repo_path: Path) -> tuple[str, str]:
         return "error", " ❓ Error"
 
 
+def check_subdir_remote_status(source_url: str, local_hash: str) -> tuple[str, str]:
+    """
+    Check if a subdir-based skill has updates available by comparing commit hash.
+    Returns: (status_code, status_message)
+    """
+    if not source_url or not local_hash:
+        return "unknown", ""
+
+    try:
+        # Fetch remote HEAD hash
+        result = subprocess.run(
+            ["git", "ls-remote", source_url, "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        output = result.stdout.strip()
+        if not output:
+            return "error", " ❓ Unknown remote"
+
+        remote_hash = output.split()[0]
+
+        if remote_hash == local_hash:
+            return "up_to_date", " ✅ Up to date"
+        else:
+            return "update_available", f" ⬇️  Update available ({remote_hash[:7]})"
+
+    except subprocess.TimeoutExpired:
+        return "error", " ⏱️  Timeout"
+    except Exception:
+        return "error", " ❓ Error checking remote"
+
+
 def check_path_status(path: Path, expected_source: Path = None) -> tuple[str, str]:
     """
     Check path status.
@@ -144,13 +179,23 @@ def list_all_skills():
                 repo_path = skill_info["path"]
                 source_type = skill_info.get("source_type", config.SOURCE_TYPE_UNKNOWN)
 
-                if (
-                    source_type == config.SOURCE_TYPE_GIT
-                    or (repo_path / ".git").exists()
-                ):
-                    git_check_futures[skill_name] = executor.submit(
-                        check_git_remote_status, repo_path
-                    )
+                if source_type == config.SOURCE_TYPE_GIT:
+                    source_info = skill_info.get("source_info", {})
+                    source_subdir = source_info.get("source_subdir")
+                    commit_hash = source_info.get("commit_hash")
+
+                    if source_subdir and commit_hash:
+                        # Subdir skill check
+                        git_check_futures[skill_name] = executor.submit(
+                            check_subdir_remote_status,
+                            source_info.get("source_url"),
+                            commit_hash,
+                        )
+                    elif (repo_path / ".git").exists():
+                        # Standard git repo check
+                        git_check_futures[skill_name] = executor.submit(
+                            check_git_remote_status, repo_path
+                        )
 
     # Count stats by source type
     in_repo_global = 0
