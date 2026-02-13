@@ -380,11 +380,8 @@ def ask_sync_targets(available_platforms: dict, is_local: bool) -> list[str]:
     other_targets = []
 
     for p_id, info in available_platforms.items():
-        # Check if Universal (.agents/skills)
-        path_str = str(info["path"])
-
-        # Heuristic: ends with .agents/skills or .agent/skills?
-        if ".agents/skills" in path_str:
+        # Check if Universal agent
+        if p_id in config.UNIVERSAL_AGENTS:
             universal_targets.append((p_id, info))
         else:
             other_targets.append((p_id, info))
@@ -470,6 +467,12 @@ def sync_to_platforms(
         return
 
     for p_id in selected_ids:
+        if p_id in config.UNIVERSAL_AGENTS:
+            # Skip symlink for universal agents
+            name = available_platforms[p_id]["name"]
+            print(f"   ✅ {name}: (Native support)")
+            continue
+
         if p_id in available_platforms:
             info = available_platforms[p_id]
             target = info["path"] / skill_name
@@ -498,6 +501,10 @@ def update_sync_metadata(
 
     new_targets = []
     for p_id in selected_ids:
+        # Skip metadata for universal agents (they don't have symlinks)
+        if p_id in config.UNIVERSAL_AGENTS:
+            continue
+
         if p_id in available_platforms:
             new_targets.append(str(available_platforms[p_id]["path"] / skill_name))
 

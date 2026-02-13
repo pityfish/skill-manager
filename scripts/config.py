@@ -54,6 +54,18 @@ SOURCE_TYPE_UNKNOWN = "unknown"  # Unknown source
 
 # Supported Platforms Configuration
 # Format: { "Display Name": { "id": "internal_id", "global": Path, "local": "local_project_path" } }
+
+# Agents that natively support the central skill repo (~/.agents/skills)
+# These do NOT need symlinks.
+UNIVERSAL_AGENTS = {
+    "amp",
+    "codex",
+    "gemini-cli",
+    "github-copilot",
+    "kimi-cli",
+    "opencode",
+}
+
 SUPPORTED_PLATFORMS = {
     "AdaL": {
         "id": "adal",

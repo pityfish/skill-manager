@@ -271,6 +271,10 @@ def list_all_skills():
         platforms_synced = 0
 
         for p_id, info in available_platforms.items():
+            # Skip Universal Agents here (handled separately)
+            if p_id in config.UNIVERSAL_AGENTS:
+                continue
+
             # Determine path based on scope
             platform_target_root = config.get_platform_target_path(p_id, scope)
 
@@ -285,6 +289,27 @@ def list_all_skills():
 
             if icon == "✅":
                 platforms_synced += 1
+
+        # Universal Agents Status
+        universal_names = [
+            info["name"]
+            for p_id, info in available_platforms.items()
+            if p_id in config.UNIVERSAL_AGENTS
+        ]
+
+        if universal_names:
+            names_str = ", ".join(sorted(universal_names))
+            # Truncate if too long?
+            if len(names_str) > 50:
+                names_str = names_str[:47] + "..."
+
+            if repo_exists:
+                print(f"   Universal ({names_str}): ✅ Native Support")
+                # Count as synced? Conceptually yes.
+                synced_count += 1
+            else:
+                pass  # Don't show if repo doesn't exist? Or show as missing?
+                # print(f"   Universal ({names_str}): ❌ Repo missing")
 
         if platforms_synced > 0:
             synced_count += 1

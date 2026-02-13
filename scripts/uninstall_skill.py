@@ -215,10 +215,15 @@ def uninstall_skill_selective(
                     removed_via_npx.add(scope)
                     print(f"   ✅ Removed {skill_name} from {scope} Registry")
 
+                    print(f"   ✅ Removed {skill_name} from {scope} Registry")
+
     # 2. Cleanup remaining paths (in case npx didn't remove everything or for non-npx skills)
     removed_any = len(removed_via_npx) > 0
 
     for key in selected_keys:
+        if key.startswith("_"):  # Skip display-only items (like Universal Agents)
+            continue
+
         if key not in locations:
             continue
         info = locations[key]
@@ -264,6 +269,30 @@ def select_locations_to_uninstall(
                 "checked": True,  # Default to all checked
             }
         )
+
+    # Add Universal Agents warning if Repo is present
+    has_repo = "global_repo" in locations or "project_repo" in locations
+    if has_repo:
+        available = config.get_available_platforms()
+        univ_names = [
+            info["name"]
+            for pid, info in available.items()
+            if pid in config.UNIVERSAL_AGENTS
+        ]
+
+        if univ_names:
+            univ_str = ", ".join(sorted(univ_names))
+            if len(univ_str) > 40:
+                univ_str = univ_str[:37] + "..."
+
+            options.append(
+                {
+                    "id": "_universal_display_only",
+                    "label": f"Universal Agents ({univ_str}, etc.) [Native support]",
+                    "checked": True,
+                    "disabled": True,  # Cannot be unchecked independently of Repo removal
+                }
+            )
 
     menu = tui.MultiSelectMenu(
         f"Select locations to remove for '{skill_name}' ({scope})", options
