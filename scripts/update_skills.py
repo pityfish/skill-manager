@@ -261,7 +261,7 @@ def ask_skills_to_update(skills, selected_scope: str):
         targets = []
         for name, path, source_type, source_info, scope in skills:
             if source_type == config.SOURCE_TYPE_GIT or (path / ".git").exists():
-                targets.append((name, path, source_type, "git"))
+                targets.append((name, path, source_type, "git", scope))
         return targets
 
     print("\n📦 Checking for updates (parallel)...")
@@ -356,6 +356,7 @@ def ask_skills_to_update(skills, selected_scope: str):
                         s["path"],
                         s["source_type"],
                         "git_subdir" if s["name"] in subdir_skills_info else "git",
+                        s["scope"],
                     ),
                 }
             )
@@ -534,14 +535,14 @@ def main():
                 else None
             )
             if source_subdir and source_type == config.SOURCE_TYPE_GIT:
-                targets.append((name, path, source_type, "git_subdir"))
+                targets.append((name, path, source_type, "git_subdir", scope))
                 continue
 
             if get_git_repo_status(path) != "git":
                 print(f"⚠️  Skill '{name}' is not a git repository.")
                 continue
 
-            targets.append((name, path, source_type, "git"))
+            targets.append((name, path, source_type, "git", scope))
 
     elif args.all:
         all_skills = get_all_updatable_skills()
@@ -552,9 +553,9 @@ def main():
                 else None
             )
             if source_subdir and source_type == config.SOURCE_TYPE_GIT:
-                targets.append((name, path, source_type, "git_subdir"))
+                targets.append((name, path, source_type, "git_subdir", scope))
             elif source_type == config.SOURCE_TYPE_GIT or (path / ".git").exists():
-                targets.append((name, path, source_type, "git"))
+                targets.append((name, path, source_type, "git", scope))
 
     # 3. Interactive mode (only if no flags set)
     elif not non_interactive:
@@ -630,7 +631,7 @@ def main():
 
     # Filter to git-updatable and subdir-updatable skills
     git_targets = [
-        (n, p, st, m) for n, p, st, m in targets if m in ("git", "git_subdir")
+        (n, p, st, m, sc) for n, p, st, m, sc in targets if m in ("git", "git_subdir")
     ]
 
     if not git_targets:
@@ -643,13 +644,10 @@ def main():
 
     updated_count = 0
 
-    for name, path, source_type, method in git_targets:
+    for name, path, source_type, method, scope in git_targets:
         if method == "git_subdir":
             # 子目录类型：需要从 metadata 获取 source_url 和 source_subdir
-            skill_meta = config.load_metadata().get(name, {})
-            # 也检查 project scope
-            if not skill_meta:
-                skill_meta = config.load_metadata("project").get(name, {})
+            skill_meta = config.load_metadata(scope).get(name, {})
             source_url = skill_meta.get("source_url", "")
             source_subdir = skill_meta.get("source_subdir", "")
             if not source_url or not source_subdir:
@@ -658,27 +656,36 @@ def main():
                 )
                 continue
 
-            # 执行更新
-            result, new_hash = update_git_subdir_skill(path, source_url, source_subdir)
+            # Check updates first
+            local_hash = skill_meta.get("commit_hash")
+            update_needed, msg = check_subdir_updates_available(
+                source_url, path, source_subdir, local_hash
+            )
+
+            if not update_needed:
+                result = "up_to_date"
+                new_hash = local_hash
+            else:
+                # 执行更新
+                result, new_hash = update_git_subdir_skill(
+                    path, source_url, source_subdir
+                )
 
             # 如果更新成功且有新 hash，更新 metadata
             if result == "updated" and new_hash:
-                skill_meta["commit_hash"] = new_hash
-                # 保存 metadata (需判断是 global 还是 project)
-                # 重新加载确定 scope
-                target_scope = "global"
-                if config.load_metadata("project").get(name):
-                    target_scope = "project"
-
-                md = config.load_metadata(target_scope)
+                # 重新加载 metadata 以防并发修改（尽管这里是串行）
+                md = config.load_metadata(scope)
                 if name in md:
                     md[name]["commit_hash"] = new_hash
-                    config.save_metadata(md, target_scope)
+                    config.save_metadata(md, scope)
+
+                # Metadata updated
         else:
             result = update_git_repo(path)
 
         if result == "up_to_date":
-            print(f"   ✅ {name:25} [Up to date]")
+            # print(f"   ✅ {name:25} [Up to date]")
+            pass
         elif result == "updated":
             print(f"   ⬇️  {name:25} [Updated successfully]")
             updated_count += 1
