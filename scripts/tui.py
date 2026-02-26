@@ -3,6 +3,9 @@ import sys
 import tty
 import termios
 import shutil
+import re
+
+ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 
 class MultiSelectMenu:
@@ -46,9 +49,13 @@ class MultiSelectMenu:
         while True:
             # Get terminal size
             try:
-                cols, _ = shutil.get_terminal_size()
+                cols, rows = shutil.get_terminal_size(fallback=(80, 24))
             except Exception:
-                cols = 80
+                cols, rows = 80, 24
+
+            # Dynamic max height based on screen size to prevent overflow
+            # Title (2) + Footer (2) + prompt (about 4) = approx 8
+            self.max_height = max(5, min(15, rows - 8))
 
             # Safety margin
             width = max(20, cols - 1)
@@ -98,8 +105,9 @@ class MultiSelectMenu:
                 prefix_len = 7
                 avail_label = max(5, width - prefix_len - 2)  # -2 safety
 
-                if len(label) > avail_label:
-                    label = label[: avail_label - 3] + "..."
+                real_len = len(ANSI_ESCAPE.sub("", label))
+                if real_len > avail_label:
+                    label = label[: avail_label + 10] + "...\033[0m"
 
                 if is_selected:
                     line = f"{color} {marker} {checkbox} {label}{reset}"
@@ -151,6 +159,13 @@ class MultiSelectMenu:
             buffer.append("")
             buffer.append(footer)
 
+            # Reserve space efficiently on first draw to avoid being pushed off-screen.
+            if first_draw:
+                sys.stdout.write("\n" * len(buffer))
+                sys.stdout.flush()
+                sys.stdout.write(f"\033[{len(buffer)}A")
+                sys.stdout.flush()
+
             # Clear previous output
             if not first_draw:
                 # Move up N lines
@@ -159,8 +174,6 @@ class MultiSelectMenu:
                     sys.stdout.write("\033[J")  # Clear below
 
             # Print
-            # Using sys.stdout.write to verify exact line control?
-            # But print is fine if we count correctly.
             print("\n".join(buffer))
             prev_lines = buffer
             first_draw = False

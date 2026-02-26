@@ -373,7 +373,13 @@ def ask_skills_to_update(skills, selected_scope: str):
                 "id": "__npx_update__",
                 "label": "Update all npx skills (via 'npx skills update')",
                 "checked": False,
-                "raw": ("__npx_update__", None, config.SOURCE_TYPE_NPX, "npx"),
+                "raw": (
+                    "__npx_update__",
+                    None,
+                    config.SOURCE_TYPE_NPX,
+                    "npx",
+                    "global",
+                ),
             }
         )
 
@@ -579,7 +585,8 @@ def main():
         return
 
     # Check for npx update request
-    if len(targets) == 1 and targets[0][0] == "__npx_update__":
+    npx_update_requested = any(t[0] == "__npx_update__" for t in targets)
+    if npx_update_requested:
         # Scan for npx skills to determine what to run
         has_global_npx = False
         has_project_npx = False
@@ -630,12 +637,8 @@ def main():
             except FileNotFoundError:
                 print("❌ npx not found.")
 
-        return
-
     # Filter to git-updatable and subdir-updatable skills
-    git_targets = [
-        (n, p, st, m, sc) for n, p, st, m, sc in targets if m in ("git", "git_subdir")
-    ]
+    git_targets = [t for t in targets if len(t) == 5 and t[3] in ("git", "git_subdir")]
 
     if not git_targets:
         print("\n⚠️  No Git-based skills selected for update.")
