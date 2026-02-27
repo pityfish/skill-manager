@@ -446,6 +446,12 @@ def main():
         action="store_true",
         help="Run 'npx skills update' for npx-installed skills",
     )
+    parser.add_argument(
+        "--scope",
+        choices=["global", "project"],
+        default=None,
+        help="Target scope (skip TUI scope selection in interactive mode)",
+    )
     args = parser.parse_args()
 
     # Determine mode
@@ -568,7 +574,11 @@ def main():
 
     # 3. Interactive mode (only if no flags set)
     elif not non_interactive:
-        selected_scope = config.ask_scope_tui("Which scope do you want to update?")
+        # Interactive mode—需要选择 scope
+        if args.scope:
+            selected_scope = args.scope
+        else:
+            selected_scope = config.ask_scope_tui("Which scope do you want to update?")
         all_skills = get_all_updatable_skills(scope=selected_scope)
 
         if not all_skills:

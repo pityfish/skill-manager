@@ -90,8 +90,27 @@ def print_readme_content(readme_path: Path, max_lines: int = 100):
     print(f"\n{'='*60}")
 
 
-def ask_skill_selection(skill_roots: list[Path], cloned_path: Path) -> list[Path]:
-    """通过 TUI 让用户选择要安装的 skill 子目录。"""
+def ask_skill_selection(
+    skill_roots: list[Path], cloned_path: Path, skill_names: list[str] = None
+) -> list[Path]:
+    """通过 TUI 让用户选择要安装的 skill 子目录。支持非交互模式。"""
+    # 非交互模式：通过 skill_names 参数直接选择
+    if skill_names is not None:
+        if skill_names == ["all"]:
+            return skill_roots
+        # 按名称匹配 skill 子目录
+        matched = []
+        for name in skill_names:
+            found = False
+            for root in skill_roots:
+                if root.name == name:
+                    matched.append(root)
+                    found = True
+                    break
+            if not found:
+                print(f"⚠️  Skill subdirectory '{name}' not found in repo, skipping.")
+        return matched
+
     # 导入 TUI
     try:
         import tui
@@ -271,14 +290,19 @@ def check_conflicts(
     return conflicts
 
 
-def ask_user_overwrite(conflicts: dict) -> bool:
-    """Ask user whether to overwrite existing skills."""
+def ask_user_overwrite(conflicts: dict, auto_yes: bool = False) -> bool:
+    """Ask user whether to overwrite existing skills. 支持非交互模式。"""
     print("\n⚠️  Conflicts detected:")
     for platform, path in conflicts.items():
         is_symlink = path.is_symlink()
         link_target = f" → {path.resolve()}" if is_symlink else ""
         type_str = "symlink" if is_symlink else "directory/file"
         print(f"   - {platform}: {path} ({type_str}{link_target})")
+
+    # 非交互模式：自动确认覆盖
+    if auto_yes:
+        print("   (--yes: auto-confirmed)")
+        return True
 
     response = input("\nOverwrite existing installations? [y/N]: ").strip().lower()
     return response == "y"
@@ -350,8 +374,10 @@ def create_symlink(source: Path, target: Path, force: bool = False):
 # Using config.ask_scope_tui instead
 
 
-def ask_sync_targets(available_platforms: dict, is_local: bool) -> list[str]:
-    """Ask user which platforms to sync to based on available platforms using TUI."""
+def ask_sync_targets(
+    available_platforms: dict, is_local: bool, agent_ids: list[str] = None
+) -> list[str]:
+    """Ask user which platforms to sync to based on available platforms using TUI. 支持非交互模式。"""
     if not available_platforms:
         if is_local:
             print("\n⚠️  No local project configuration found in current directory.")
@@ -359,6 +385,22 @@ def ask_sync_targets(available_platforms: dict, is_local: bool) -> list[str]:
         else:
             print("\n⚠️  No supported platforms detected on this system.")
         return []
+
+    # 非交互模式：通过 agent_ids 参数直接指定
+    if agent_ids is not None:
+        if agent_ids == ["all"]:
+            selected = list(available_platforms.keys())
+            print(f"\n✅ Selected (--agents all): {len(selected)} agents")
+            return selected
+        # 验证指定的 agent ID 是否在 available_platforms 中
+        valid_ids = []
+        for aid in agent_ids:
+            if aid in available_platforms:
+                valid_ids.append(aid)
+            else:
+                print(f"⚠️  Agent '{aid}' not found / not available, skipping.")
+        print(f"\n✅ Selected: {len(valid_ids)} agents")
+        return valid_ids
 
     # Try to import TUI (local project script)
     try:
@@ -536,10 +578,14 @@ def _install_single_skill(
     source_url: Optional[str] = None,
     source_subdir: Optional[str] = None,
     commit_hash: Optional[str] = None,
+    agent_ids: list[str] = None,
+    auto_yes: bool = False,
 ):
     """
     安装单个 skill 的完整流程（从 conflict 检查到 sync）。
     提取为独立函数以支持多 skill repo 的逐个安装。
+    agent_ids: 非交互模式指定同步目标（"all" 或具体 ID 列表）
+    auto_yes: 非交互模式自动确认覆盖
     """
     available_platforms = get_platform_paths(scope)
     repo_path_root = config.get_skill_repo(scope)
@@ -548,7 +594,7 @@ def _install_single_skill(
     conflicts = check_conflicts(skill_name, available_platforms, scope)
     force = False
     if conflicts:
-        if not ask_user_overwrite(conflicts):
+        if not ask_user_overwrite(conflicts, auto_yes=auto_yes):
             print(f"   ⏭️  Skipping '{skill_name}'.")
             return
         force = True
@@ -561,7 +607,9 @@ def _install_single_skill(
     print(f"   ✅ Stored at: {repo_path}")
 
     # 选择同步目标
-    sync_targets = ask_sync_targets(available_platforms, scope == "project")
+    sync_targets = ask_sync_targets(
+        available_platforms, scope == "project", agent_ids=agent_ids
+    )
 
     # 同步到平台
     sync_to_platforms(repo_path, skill_name, sync_targets, available_platforms, force)
@@ -605,8 +653,32 @@ def main():
         action="store_true",
         help="Deprecated alias for --scope project",
     )
+    parser.add_argument(
+        "--agents",
+        default=None,
+        help="Non-interactive: comma-separated agent IDs to sync to, or 'all'",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Non-interactive: auto-confirm overwrites",
+    )
+    parser.add_argument(
+        "--skills",
+        default=None,
+        help="Non-interactive: comma-separated skill subdirectory names for multi-skill repos, or 'all'",
+    )
 
     args = parser.parse_args()
+
+    # 解析非交互参数
+    agent_ids = None
+    if args.agents is not None:
+        agent_ids = [a.strip() for a in args.agents.split(",") if a.strip()]
+
+    cli_skill_names = None
+    if args.skills is not None:
+        cli_skill_names = [s.strip() for s in args.skills.split(",") if s.strip()]
 
     # Handle deprecated --local flag
     if args.local:
@@ -681,7 +753,9 @@ def main():
                     print_readme_content(analysis["readmes"][0])
 
                 # 让用户选择要安装的 skill
-                selected = ask_skill_selection(analysis["skill_roots"], cloned_path)
+                selected = ask_skill_selection(
+                    analysis["skill_roots"], cloned_path, skill_names=cli_skill_names
+                )
 
                 if not selected:
                     print("\n❌ No skills selected. Installation cancelled.")
@@ -711,6 +785,8 @@ def main():
                             source_url=source_input,
                             source_subdir=subdir_rel,
                             commit_hash=current_hash,
+                            agent_ids=agent_ids,
+                            auto_yes=args.yes,
                         )
                     print(f"\n✅ All {len(selected)} skill(s) installed!")
                     return  # 多 skill 安装完毕，直接返回
@@ -732,16 +808,19 @@ def main():
                     print(f"   Cloned to: {cloned_path}")
 
                 # 询问用户是否仍要强制安装整个 repo 作为 skill
-                response = (
-                    input("\n⚠️  Force install the entire repo as a skill? [y/N]: ")
-                    .strip()
-                    .lower()
-                )
-                if response != "y":
-                    print("\n❌ Installation cancelled. Repo is preserved at:")
-                    print(f"   {cloned_path}")
-                    temp_dir = None  # 不清理临时目录，保留给用户
-                    sys.exit(0)
+                if args.yes:
+                    print("   (--yes: auto-confirmed force install)")
+                else:
+                    response = (
+                        input("\n⚠️  Force install the entire repo as a skill? [y/N]: ")
+                        .strip()
+                        .lower()
+                    )
+                    if response != "y":
+                        print("\n❌ Installation cancelled. Repo is preserved at:")
+                        print(f"   {cloned_path}")
+                        temp_dir = None  # 不清理临时目录，保留给用户
+                        sys.exit(0)
 
                 source_path = cloned_path
 
@@ -804,6 +883,8 @@ def main():
             scope=args.scope,
             is_git=is_git,
             source_url=source_input,
+            agent_ids=agent_ids,
+            auto_yes=args.yes,
         )
 
     finally:

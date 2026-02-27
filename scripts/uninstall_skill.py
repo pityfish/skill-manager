@@ -9,6 +9,7 @@ Uninstall a skill from central repo and/or selected platforms.
 import sys
 import json
 import shutil
+import argparse
 import subprocess
 from pathlib import Path
 
@@ -246,9 +247,13 @@ def uninstall_skill_selective(
 
 
 def select_locations_to_uninstall(
-    skill_name: str, locations: dict, scope: str
+    skill_name: str, locations: dict, scope: str, select_all: bool = False
 ) -> list[str]:
-    """Ask user which locations to uninstall from."""
+    """询问用户要从哪些位置卸载。支持非交互模式。"""
+    # 非交互模式：直接返回所有 location keys
+    if select_all:
+        return list(locations.keys())
+
     # Import tui here to ensure it's available
     try:
         import tui
@@ -304,13 +309,39 @@ def select_locations_to_uninstall(
 
 
 def main():
-    skill_name = sys.argv[1] if len(sys.argv) > 1 else None
+    parser = argparse.ArgumentParser(
+        description="Uninstall a skill from central repo and/or platforms."
+    )
+    parser.add_argument(
+        "skill_name",
+        nargs="?",
+        default=None,
+        help="Name of the skill to uninstall (omit for interactive TUI mode)",
+    )
+    parser.add_argument(
+        "--scope",
+        choices=["global", "project"],
+        default=None,
+        help="Target scope (skip TUI scope selection)",
+    )
+    parser.add_argument(
+        "--all-locations",
+        action="store_true",
+        help="Non-interactive: remove from all detected locations (skip location TUI)",
+    )
 
-    # Case 1: Interactive mode (no skill name specified)
-    if not skill_name:
-        selected_scope = config.ask_scope_tui(
-            "Which scope do you want to uninstall from?"
-        )
+    args = parser.parse_args()
+
+    # Case 1: Interactive mode (未指定 skill name)
+    if not args.skill_name:
+        # 选择 scope
+        if args.scope:
+            selected_scope = args.scope
+        else:
+            selected_scope = config.ask_scope_tui(
+                "Which scope do you want to uninstall from?"
+            )
+
         skills_to_remove = ask_skill_to_uninstall(selected_scope)
 
         if not skills_to_remove:
@@ -330,9 +361,12 @@ def main():
                 )
                 continue
 
-            # NEW: Ask which locations to remove
+            # 选择要移除的位置
             keys_to_remove = select_locations_to_uninstall(
-                name, scope_locations, selected_scope
+                name,
+                scope_locations,
+                selected_scope,
+                select_all=args.all_locations,
             )
 
             if not keys_to_remove:
@@ -342,8 +376,8 @@ def main():
             uninstall_skill_selective(name, keys_to_remove, scope_locations)
         return
 
-    # Case 2: Specified skill name via CLI
-    # Find where skill exists
+    # Case 2: 指定了 skill name
+    skill_name = args.skill_name
     locations = get_skill_locations(skill_name)
 
     if not locations:
@@ -354,15 +388,16 @@ def main():
     has_global = any(l["scope"] == "global" for l in locations.values())
     has_project = any(l["scope"] == "project" for l in locations.values())
 
-    selected_scope = None
-    if has_global and has_project:
-        selected_scope = config.ask_scope_tui(
-            f"Skill '{skill_name}' found in both scopes. Select which one to process:"
-        )
-    elif has_global:
-        selected_scope = "global"
-    elif has_project:
-        selected_scope = "project"
+    selected_scope = args.scope
+    if selected_scope is None:
+        if has_global and has_project:
+            selected_scope = config.ask_scope_tui(
+                f"Skill '{skill_name}' found in both scopes. Select which one to process:"
+            )
+        elif has_global:
+            selected_scope = "global"
+        elif has_project:
+            selected_scope = "project"
 
     # Filter locations to selected scope
     final_locations = {
@@ -384,9 +419,12 @@ def main():
         )
         print(f"   Uninstalling will automatically trigger 'npx skills remove'.")
 
-    # NEW: Ask which locations to remove
+    # 选择要移除的位置
     keys_to_remove = select_locations_to_uninstall(
-        skill_name, final_locations, selected_scope
+        skill_name,
+        final_locations,
+        selected_scope,
+        select_all=args.all_locations,
     )
 
     if not keys_to_remove:

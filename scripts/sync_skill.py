@@ -29,11 +29,21 @@ def main():
         default=None,
         help="Target scope: Auto-detect (default), 'global', or 'project'",
     )
+    parser.add_argument(
+        "--agents",
+        default=None,
+        help="Non-interactive: comma-separated agent IDs to sync to, or 'all'",
+    )
 
     args = parser.parse_args()
 
     skill_name = args.skill_name
     scope = args.scope
+
+    # 解析 --agents 参数
+    agent_ids = None
+    if args.agents is not None:
+        agent_ids = [a.strip() for a in args.agents.split(",") if a.strip()]
 
     # Auto-detect scope if not provided
     if scope is None:
@@ -80,8 +90,10 @@ def main():
     # Determine target platforms
     available_platforms = get_platform_paths(scope)
 
-    # Ask user which platforms to sync
-    sync_targets = ask_sync_targets(available_platforms, scope == "project")
+    # Ask user which platforms to sync (或通过 --agents 非交互指定)
+    sync_targets = ask_sync_targets(
+        available_platforms, scope == "project", agent_ids=agent_ids
+    )
 
     # Sync to platforms
     sync_to_platforms(
