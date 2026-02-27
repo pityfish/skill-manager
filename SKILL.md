@@ -36,8 +36,12 @@ python3 <path_to_skill_manager>/scripts/install_skill.py <skill_source> --scope 
 ### 3. 📋 List & Check Skills
 **Usage**: List all installed skills, check current capabilities, and verify sync status.
 ```bash
-python3 <path_to_skill_manager>/scripts/list_skills.py
+python3 <path_to_skill_manager>/scripts/list_skills.py --brief
 ```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `--brief` | Recommended | One line per skill (compact output for agents with limited display) |
+| `--scope <global\|project>` | Optional | Filter by scope |
 
 ### 4. 🔄 Sync Skill
 **Usage**: Fix missing tools or sync to a new agent environment.

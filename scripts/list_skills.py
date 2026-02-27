@@ -5,6 +5,7 @@ Shows installation source (npx skills vs Git/Local), scope (Global/Project), and
 """
 
 import json
+import argparse
 import subprocess
 import concurrent.futures
 from pathlib import Path
@@ -371,8 +372,95 @@ def list_all_skills():
         print(f"   {info['name']:15}: {info['path']}")
 
 
+def list_skills_brief(scope: str = None):
+    """精简模式：每个 skill 一行，适合输出窗口有限的 Agent。"""
+    skills_with_sources = config.get_all_skills_with_sources(scope=scope)
+
+    if not skills_with_sources:
+        print("📭 No skills found.")
+        return
+
+    # 并行检查 git 更新状态
+    git_futures = {}
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        for name, info in skills_with_sources.items():
+            source_type = info.get("source_type", config.SOURCE_TYPE_UNKNOWN)
+            if source_type == config.SOURCE_TYPE_GIT:
+                source_info = info.get("source_info", {})
+                source_subdir = (
+                    source_info.get("source_subdir")
+                    if isinstance(source_info, dict)
+                    else None
+                )
+                commit_hash = (
+                    source_info.get("commit_hash")
+                    if isinstance(source_info, dict)
+                    else None
+                )
+                repo_path = info["path"]
+
+                if source_subdir and commit_hash:
+                    source_url = source_info.get("source_url", "")
+                    git_futures[name] = executor.submit(
+                        check_subdir_remote_status, source_url, commit_hash
+                    )
+                elif (repo_path / ".git").exists():
+                    git_futures[name] = executor.submit(
+                        check_git_remote_status, repo_path
+                    )
+
+    # 输出表头
+    print(f"📚 Skills ({len(skills_with_sources)} total)")
+    print(f"{'Name':30} {'Type':10} {'Scope':8} {'Status'}")
+    print("-" * 70)
+
+    for name in sorted(skills_with_sources.keys()):
+        info = skills_with_sources[name]
+        source_type = info.get("source_type", config.SOURCE_TYPE_UNKNOWN)
+        skill_scope = info.get("scope", "?")
+        icon = config.get_source_type_icon(source_type)
+        label = config.get_source_type_label(source_type)
+
+        # 状态
+        status = ""
+        if name in git_futures:
+            code, msg = git_futures[name].result()
+            if code == "update_available":
+                status = "⬇️  Update"
+            elif code == "up_to_date":
+                status = "✅"
+            else:
+                status = "❓"
+        elif source_type == config.SOURCE_TYPE_NPX:
+            status = "📦"
+        elif source_type == config.SOURCE_TYPE_LOCAL:
+            status = "📁"
+
+        display_name = info.get("original_name", name)
+        print(f"{icon} {display_name:28} {label:10} {skill_scope:8} {status}")
+
+
 def main():
-    list_all_skills()
+    parser = argparse.ArgumentParser(
+        description="List all skills and their sync status."
+    )
+    parser.add_argument(
+        "--brief",
+        action="store_true",
+        help="Brief output: one line per skill (suitable for agents with limited output)",
+    )
+    parser.add_argument(
+        "--scope",
+        choices=["global", "project"],
+        default=None,
+        help="Filter by scope",
+    )
+    args = parser.parse_args()
+
+    if args.brief:
+        list_skills_brief(scope=args.scope)
+    else:
+        list_all_skills()
 
 
 if __name__ == "__main__":
