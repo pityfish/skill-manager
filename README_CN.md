@@ -68,45 +68,50 @@ git clone https://github.com/your-username/skill-manager.git ~/.agents/skills/sk
 请查阅 `SKILL.md` 获取详细的触发方式。
 
 *   查找工具: 运行 `npx skills find <意图>`
-*   安装工具: 运行 `npx skills add <包名> -g -y`
+*   安装/管理: 请查阅 `SKILL.md` 获取完整的非交互 CLI 命令。
 
 ### 👤 For Humans (管理模式)
 
 **1. 安装新技能 (推荐统一命令)**
-脚本自动处理 Registry 名称、Git 链接及本地路径，并仅在必要时询问作用域。
+脚本自动处理 Registry 名称、Git 链接及本地路径。
 ```bash
-# 推荐：支持所有来源的安装
+# 交互模式 (TUI 提示选择 scope 和 agents):
 python3 scripts/install_skill.py <技能名或链接>
 
-# 示例：
-python3 scripts/install_skill.py browser-skill      # 社区技能
-python3 scripts/install_skill.py https://github... # Git 技能
+# 非交互模式 (适用于 Agent 或自动化脚本):
+python3 scripts/install_skill.py <技能名或链接> --scope global --agents all --yes
 ```
 
-> 💡 **智能 Git 安装**：从 GitHub URL 安装时，脚本会自动分析 repo 结构。如果 repo 包含多个子目录 skill，会弹出选择菜单；如果找不到 `SKILL.md`，会打印 README 供参考。
+> 💡 **智能 Git 安装**：从 GitHub URL 安装时，脚本会自动分析 repo 结构。如果 repo 包含多个子目录 skill，使用 `--skills all` 或 `--skills name1,name2` 来选择；如果找不到 `SKILL.md`，会打印 README 供参考。
 
 **3. 同步与更新**
 ```bash
-# 交互式更新 (TUI 按需勾选)
+# 非交互一键更新 (推荐 Agent 使用):
+python3 scripts/update_skills.py --all --scope global
+
+# 交互式更新 (TUI 按需勾选):
 python3 scripts/update_skills.py
 
-# 智能更新指定技能
-# 仅当该技能在全局和项目级同时存在时，才会询问作用域。
+# 更新指定技能:
 python3 scripts/update_skills.py <技能名称>
-
-# 一键自动更新 (推荐)
-python3 scripts/update_skills.py --all --npx
 ```
 
 **4. 查看 Agent 当前能做什么**
 ```bash
+# 精简模式 (紧凑输出，适合 Agent):
+python3 scripts/list_skills.py --brief
+
+# 完整详情:
 python3 scripts/list_skills.py
 ```
 
 **5. 彻底卸载**
 ```bash
-# 从中央仓库、Registry (如果是 npx 来源) 以及所有同步的 Agent 中移除
-python3 scripts/uninstall_skill.py <技能名称>
+# 非交互 (从所有位置移除):
+python3 scripts/uninstall_skill.py <技能名称> --scope global --all-locations
+
+# 交互模式 (TUI 选择):
+python3 scripts/uninstall_skill.py
 ```
 
 ## 🔌 支持的智能体
@@ -118,17 +123,19 @@ python3 scripts/uninstall_skill.py <技能名称>
 | **Antigravity** | `~/.gemini/antigravity/skills` | `.agent/skills` |
 | **Augment** | `~/.augment/skills` | `.augment/skills` |
 | **Claude Code** | `~/.claude/skills` | `.claude/skills` |
-| **Cline** | `~/.cline/skills` | `.cline/skills` |
+| **Cline** | `~/.agents/skills` | `.agents/skills` |
 | **CodeBuddy** | `~/.codebuddy/skills` | `.codebuddy/skills` |
 | **Codex** | `~/.codex/skills` | `.agents/skills` |
 | **Command Code** | `~/.commandcode/skills` | `.commandcode/skills` |
 | **Continue** | `~/.continue/skills` | `.continue/skills` |
+| **Cortex Code** | `~/.snowflake/cortex/skills` | `.cortex/skills` |
 | **Crush** | `~/.config/crush/skills` | `.crush/skills` |
-| **Cursor** | `~/.cursor/skills` | `.cursor/skills` |
+| **Cursor** | `~/.cursor/skills` | `.agents/skills` |
 | **Droid** | `~/.factory/skills` | `.factory/skills` |
 | **Gemini CLI** | `~/.gemini/skills` | `.agents/skills` |
 | **GitHub Copilot** | `~/.copilot/skills` | `.agents/skills` |
 | **Goose** | `~/.config/goose/skills` | `.goose/skills` |
+| **iFlow CLI** | `~/.iflow/skills` | `.iflow/skills` |
 | **Junie** | `~/.junie/skills` | `.junie/skills` |
 | **Kilo Code** | `~/.kilocode/skills` | `.kilocode/skills` |
 | **Kimi Code CLI** | `~/.config/agents/skills` | `.agents/skills` |
@@ -138,7 +145,7 @@ python3 scripts/uninstall_skill.py <技能名称>
 | **Mistral Vibe** | `~/.vibe/skills` | `.vibe/skills` |
 | **Mux** | `~/.mux/skills` | `.mux/skills` |
 | **Neovate** | `~/.neovate/skills` | `.neovate/skills` |
-| **OpenClaw** | `~/.moltbot/skills` | `skills` |
+| **OpenClaw** | `~/.openclaw/skills` | `skills` |
 | **OpenCode** | `~/.config/opencode/skills` | `.agents/skills` |
 | **OpenHands** | `~/.openhands/skills` | `.openhands/skills` |
 | **Pi** | `~/.pi/agent/skills` | `.pi/skills` |
@@ -151,12 +158,11 @@ python3 scripts/uninstall_skill.py <技能名称>
 | **Trae CN** | `~/.trae-cn/skills` | `.trae/skills` |
 | **Windsurf** | `~/.codeium/windsurf/skills` | `.windsurf/skills` |
 | **Zencoder** | `~/.zencoder/skills` | `.zencoder/skills` |
-| **iFlow CLI** | `~/.iflow/skills` | `.iflow/skills` |
 
 ## ❓ 常见问题
 
 **Q: Agent 说它找不到我在用的工具。**
-A: 确保你在 TUI 菜单中选择了正确的作用域，或者运行 `python3 scripts/list_skills.py` 检查详细的同步状态和仓库路径。
+A: 运行 `python3 scripts/list_skills.py --brief` 检查当前状态，确认技能已同步到你使用的 Agent 平台。
 
 **Q: 怎么卸载技能？**
-A: `python3 scripts/uninstall_skill.py <skill-name>`。如果它是 Registry 技能，脚本会自动触发 `npx skills remove`。
+A: `python3 scripts/uninstall_skill.py <skill-name> --scope global --all-locations`。如果它是 Registry 技能，脚本会自动触发 `npx skills remove`。

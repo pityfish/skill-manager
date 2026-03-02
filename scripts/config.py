@@ -94,8 +94,8 @@ SUPPORTED_PLATFORMS = {
     },
     "Cline": {
         "id": "cline",
-        "global": Path.home() / ".cline/skills",
-        "local": ".cline/skills",
+        "global": Path.home() / ".agents/skills",
+        "local": ".agents/skills",
     },
     "CodeBuddy": {
         "id": "codebuddy",
@@ -125,12 +125,17 @@ SUPPORTED_PLATFORMS = {
     "Cursor": {
         "id": "cursor",
         "global": Path.home() / ".cursor/skills",
-        "local": ".cursor/skills",
+        "local": ".agents/skills",
     },
     "Droid": {
         "id": "droid",
         "global": Path.home() / ".factory/skills",
         "local": ".factory/skills",
+    },
+    "Cortex Code": {
+        "id": "cortex",
+        "global": Path.home() / ".snowflake/cortex/skills",
+        "local": ".cortex/skills",
     },
     "Gemini CLI": {
         "id": "gemini-cli",
@@ -199,7 +204,7 @@ SUPPORTED_PLATFORMS = {
     },
     "OpenClaw": {
         "id": "openclaw",
-        "global": Path.home() / ".moltbot/skills",
+        "global": Path.home() / ".openclaw/skills",
         "local": "skills",
     },
     "OpenCode": {

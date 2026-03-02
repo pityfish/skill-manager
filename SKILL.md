@@ -23,13 +23,13 @@ npx skills find <search_query>
 **Constraint**: You **MUST** use the following script. **NEVER** use `npx skills add` directly.
 
 ```bash
-python3 <path_to_skill_manager>/scripts/install_skill.py <skill_source> --scope <global|project> --agents all --yes
+python3 <path_to_skill_manager>/scripts/install_skill.py <skill_source> --scope <global|project> --agents <ids|all> --yes
 ```
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `<skill_source>` | Yes | Git URL, local path, or registry name |
 | `--scope <global\|project>` | Yes | Installation scope. Ask user if unclear. |
-| `--agents <ids\|all>` | Yes | Comma-separated agent IDs or `all` |
+| `--agents <ids\|all>` | Yes | Comma-separated agent IDs or `all`. **Ask user** which agents to sync to. Use `list_skills.py --brief` to see available platforms. |
 | `--yes` | Recommended | Auto-confirm overwrites |
 | `--skills <names\|all>` | For multi-skill repos | Comma-separated skill subdirectory names or `all` |
 
@@ -46,13 +46,13 @@ python3 <path_to_skill_manager>/scripts/list_skills.py --brief
 ### 4. 🔄 Sync Skill
 **Usage**: Fix missing tools or sync to a new agent environment.
 ```bash
-python3 <path_to_skill_manager>/scripts/sync_skill.py <skill_name> --scope <global|project> --agents all
+python3 <path_to_skill_manager>/scripts/sync_skill.py <skill_name> --scope <global|project> --agents <ids|all>
 ```
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `<skill_name>` | Yes | Name of the installed skill |
 | `--scope <global\|project>` | Optional | Scope (auto-detected if omitted) |
-| `--agents <ids\|all>` | Yes | Comma-separated agent IDs or `all` |
+| `--agents <ids\|all>` | Yes | Comma-separated agent IDs or `all`. **Ask user** which agents to sync to. |
 
 ### 5. 🆙 Update Skills
 **Usage**: Update installed skills to latest versions.
@@ -83,7 +83,8 @@ python3 <path_to_skill_manager>/scripts/uninstall_skill.py <skill_name> --scope 
 2.  **Strictly Non-Autonomous Installation**: After running `npx skills find`, you must show the list to the user and wait. **Proactive installation is strictly forbidden.**
 3.  **No Direct NPX Calls**: You **MUST NOT** call `npx skills add` or `npx skills remove` directly. Use the provided Python scripts (`install_skill.py`, `uninstall_skill.py`) for these actions.
 4.  **Parameter Extraction**: When the user says "install X globally", extract `scope=global`. When the user says "uninstall Y", extract `skill_name=Y` and ask for scope if ambiguous.
-5.  **Default Sync Strategy**: Always use `--agents all` to sync to all detected platforms unless the user specifies otherwise.
+5.  **Agent Confirmation for `--agents`**: Do **NOT** blindly use `--agents all`. Ask the user which agents/platforms to sync to. You can run `list_skills.py --brief` first to see available platforms, then present the options. If the user says "install to all", then use `--agents all`. Valid `--agents` IDs (from [skills.sh](https://skills.sh)):
+    `adal`, `amp`, `antigravity`, `augment`, `claude-code`, `cline`, `codebuddy`, `codex`, `command-code`, `continue`, `cortex`, `crush`, `cursor`, `droid`, `gemini-cli`, `github-copilot`, `goose`, `iflow-cli`, `junie`, `kilo`, `kimi-cli`, `kiro-cli`, `kode`, `mcpjam`, `mistral-vibe`, `mux`, `neovate`, `openclaw`, `opencode`, `openhands`, `pi`, `pochi`, `qoder`, `qwen-code`, `replit`, `roo`, `trae`, `trae-cn`, `windsurf`, `zencoder`
 6.  **Verification**: Always use `python3 <path_to_skill_manager>/scripts/list_skills.py` to confirm the current state before making suggestions.
 7.  **Context Awareness**: You **MUST** execute these scripts from the **User's Current Working Directory (Project Root)**. Do **NOT** `cd` into the `scripts/` folder or the `skill-manager` repository.
 8.  **Path Resolution**: The `skill-manager` might be installed Globally (`~/.agents/skills/skill-manager`) or Locally in the project (`.agents/skills/skill-manager`). You must **detect** where it is installed and execute the scripts using that path. Do not assume it is always global.

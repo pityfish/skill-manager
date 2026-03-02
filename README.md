@@ -66,45 +66,50 @@ If you are an AI Agent reading this: **You have new skills available.**
 Check `SKILL.md` for detailed triggers.
 
 *   To find a tool: Run `npx skills find <intent>`
-*   To install a tool: Run `npx skills add <package> -g -y`
+*   To install/manage: See `SKILL.md` for full non-interactive CLI commands.
 
 ### 👤 For Humans (Management)
 
 **1. Install a new Skill (Recommended Unified Command)**
-Handles Community Registry, Git URLs, and Local paths. It prompts for scope ONLY when necessary.
+Handles Community Registry, Git URLs, and Local paths.
 ```bash
-# Handled automatically: Registry, Git, or Local
+# Interactive mode (TUI prompts for scope & agents):
 python3 scripts/install_skill.py <skill_name_or_url>
 
-# Examples:
-python3 scripts/install_skill.py browser-skill      # Community
-python3 scripts/install_skill.py https://github... # Git
+# Non-interactive mode (for agents or scripting):
+python3 scripts/install_skill.py <skill_name_or_url> --scope global --agents all --yes
 ```
 
-> 💡 **Smart Git Install**: When installing from a GitHub URL, the script automatically analyzes the repo structure. If the repo contains multiple skills in subdirectories, you'll be prompted to select which to install. If no `SKILL.md` is found, the README is printed for reference.
+> 💡 **Smart Git Install**: When installing from a GitHub URL, the script automatically analyzes the repo structure. If the repo contains multiple skills in subdirectories, use `--skills all` or `--skills name1,name2` to select. If no `SKILL.md` is found, the README is printed for reference.
 
 **3. Sync & Update**
 ```bash
-# Interactive TUI (Select skills to update)
+# Non-interactive update all (recommended for agents):
+python3 scripts/update_skills.py --all --scope global
+
+# Interactive TUI (Select skills to update):
 python3 scripts/update_skills.py
 
-# Smart Update specified skill
-# Only prompts for scope if the skill exists in both Global & Project.
+# Update specified skill:
 python3 scripts/update_skills.py <skill-name>
-
-# Auto-Update All
-python3 scripts/update_skills.py --all --npx
 ```
 
 **4. Check what your Agent can do**
 ```bash
+# Brief mode (compact, agent-friendly):
+python3 scripts/list_skills.py --brief
+
+# Full details:
 python3 scripts/list_skills.py
 ```
 
 **5. Clean Uninstall**
 ```bash
-# Removes from Central Repo, Registry (if npx), and all synced agents
-python3 scripts/uninstall_skill.py <skill-name>
+# Non-interactive (remove from all locations):
+python3 scripts/uninstall_skill.py <skill-name> --scope global --all-locations
+
+# Interactive mode (TUI selection):
+python3 scripts/uninstall_skill.py
 ```
 
 ## 🔌 Supported Agents
@@ -116,17 +121,19 @@ python3 scripts/uninstall_skill.py <skill-name>
 | **Antigravity** | `~/.gemini/antigravity/skills` | `.agent/skills` |
 | **Augment** | `~/.augment/skills` | `.augment/skills` |
 | **Claude Code** | `~/.claude/skills` | `.claude/skills` |
-| **Cline** | `~/.cline/skills` | `.cline/skills` |
+| **Cline** | `~/.agents/skills` | `.agents/skills` |
 | **CodeBuddy** | `~/.codebuddy/skills` | `.codebuddy/skills` |
 | **Codex** | `~/.codex/skills` | `.agents/skills` |
 | **Command Code** | `~/.commandcode/skills` | `.commandcode/skills` |
 | **Continue** | `~/.continue/skills` | `.continue/skills` |
+| **Cortex Code** | `~/.snowflake/cortex/skills` | `.cortex/skills` |
 | **Crush** | `~/.config/crush/skills` | `.crush/skills` |
-| **Cursor** | `~/.cursor/skills` | `.cursor/skills` |
+| **Cursor** | `~/.cursor/skills` | `.agents/skills` |
 | **Droid** | `~/.factory/skills` | `.factory/skills` |
 | **Gemini CLI** | `~/.gemini/skills` | `.agents/skills` |
 | **GitHub Copilot** | `~/.copilot/skills` | `.agents/skills` |
 | **Goose** | `~/.config/goose/skills` | `.goose/skills` |
+| **iFlow CLI** | `~/.iflow/skills` | `.iflow/skills` |
 | **Junie** | `~/.junie/skills` | `.junie/skills` |
 | **Kilo Code** | `~/.kilocode/skills` | `.kilocode/skills` |
 | **Kimi Code CLI** | `~/.config/agents/skills` | `.agents/skills` |
@@ -136,7 +143,7 @@ python3 scripts/uninstall_skill.py <skill-name>
 | **Mistral Vibe** | `~/.vibe/skills` | `.vibe/skills` |
 | **Mux** | `~/.mux/skills` | `.mux/skills` |
 | **Neovate** | `~/.neovate/skills` | `.neovate/skills` |
-| **OpenClaw** | `~/.moltbot/skills` | `skills` |
+| **OpenClaw** | `~/.openclaw/skills` | `skills` |
 | **OpenCode** | `~/.config/opencode/skills` | `.agents/skills` |
 | **OpenHands** | `~/.openhands/skills` | `.openhands/skills` |
 | **Pi** | `~/.pi/agent/skills` | `.pi/skills` |
@@ -149,12 +156,11 @@ python3 scripts/uninstall_skill.py <skill-name>
 | **Trae CN** | `~/.trae-cn/skills` | `.trae/skills` |
 | **Windsurf** | `~/.codeium/windsurf/skills` | `.windsurf/skills` |
 | **Zencoder** | `~/.zencoder/skills` | `.zencoder/skills` |
-| **iFlow CLI** | `~/.iflow/skills` | `.iflow/skills` |
 
 ## ❓ Troubleshooting
 
 **Q: My Agent still says it can't do X.**
-A: Ensure you selected the correct scope in the TUI menu, or run `python3 scripts/list_skills.py` to check the detailed sync status and repository paths.
+A: Run `python3 scripts/list_skills.py --brief` to check the current state. Ensure the skill is synced to your agent's platform.
 
 **Q: How do I remove a skill?**
-A: `python3 scripts/uninstall_skill.py <skill-name>`. It will automatically trigger `npx skills remove` if it's a registry skill.
+A: `python3 scripts/uninstall_skill.py <skill-name> --scope global --all-locations`. It will automatically trigger `npx skills remove` if it's a registry skill.
