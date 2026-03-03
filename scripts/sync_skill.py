@@ -31,8 +31,10 @@ def main():
     )
     parser.add_argument(
         "--agents",
+        nargs="?",
+        const="",
         default=None,
-        help="Non-interactive: comma-separated agent IDs to sync to, or 'all'",
+        help="Non-interactive: comma-separated agent IDs to sync to, 'all', or empty to skip syncing",
     )
 
     args = parser.parse_args()

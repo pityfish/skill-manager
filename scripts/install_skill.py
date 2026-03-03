@@ -655,8 +655,10 @@ def main():
     )
     parser.add_argument(
         "--agents",
+        nargs="?",
+        const="",
         default=None,
-        help="Non-interactive: comma-separated agent IDs to sync to, or 'all'",
+        help="Non-interactive: comma-separated agent IDs to sync to, 'all', or empty to skip syncing",
     )
     parser.add_argument(
         "--yes",
@@ -864,25 +866,33 @@ def main():
             except Exception:
                 pass
 
+        # Inherit Git metadata if moving between scopes
+        inherited_git = False
+        inherited_url = None
+        inherited_subdir = None
+        inherited_hash = None
+
         if is_inside_global or is_inside_project:
-            repo_name = "Global" if is_inside_global else "Project"
-            print(
-                f"\n⚠️  Action Aborted: Source path is already inside managed {repo_name} Repo."
-            )
-            print(f"   Path: {source_path}")
-            print(
-                f"   - To link/sync to more agents: python3 scripts/sync_skill.py {skill_name}"
-            )
-            print(f"   - To update code: python3 scripts/update_skills.py")
-            sys.exit(0)
+            source_scope = "global" if is_inside_global else "project"
+            if source_scope != args.scope:
+                source_meta = config.load_metadata(source_scope).get(skill_name, {})
+                # Check if it has git source type in metadata
+                if source_meta.get("source_type") == config.SOURCE_TYPE_GIT:
+                    inherited_git = True
+                    inherited_url = source_meta.get("source_url")
+                    inherited_subdir = source_meta.get("source_subdir")
+                    inherited_hash = source_meta.get("commit_hash")
+                    print(f"   🔗 Inherited Git tracking from {source_scope} metadata.")
 
         # 统一调用安装流程
         _install_single_skill(
             source_path=source_path,
             skill_name=skill_name,
             scope=args.scope,
-            is_git=is_git,
-            source_url=source_input,
+            is_git=is_git or inherited_git,
+            source_url=source_input if is_git else inherited_url,
+            source_subdir=inherited_subdir,
+            commit_hash=inherited_hash,
             agent_ids=agent_ids,
             auto_yes=args.yes,
         )
