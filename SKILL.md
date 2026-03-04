@@ -25,57 +25,58 @@ npx skills find <search_query>
 ```bash
 python3 <path_to_skill_manager>/scripts/install_skill.py <skill_source> --scope <global|project> --agents <ids|all> --yes
 ```
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `<skill_source>` | Yes | Git URL, local path, or registry name |
-| `--scope <global\|project>` | Yes | Installation scope. Ask user if unclear. |
-| `--agents <ids\|all>` | Yes | Comma-separated agent IDs or `all`. **Ask user** which agents to sync to. Use `list_skills.py --brief` to see available platforms. |
-| `--yes` | Recommended | Auto-confirm overwrites |
-| `--skills <names\|all>` | For multi-skill repos | Comma-separated skill subdirectory names or `all` |
+| Argument                    | Required              | Description                                                   |
+| --------------------------- | --------------------- | ------------------------------------------------------------- |
+| `<skill_source>`            | Yes                   | Git URL, local path, or registry name                         |
+| `--scope <global\|project>` | Yes                   | Installation scope. Ask user if unclear.                      |
+| `-a, --agents <ids\|all>`   | Optional              | Comma-separated agent IDs or `all`. **Omit to skip syncing**. |
+| `--yes, -y`                 | Recommended           | Auto-confirm overwrites                                       |
+| `-s, --skills <names\|all>` | For multi-skill repos | Comma-separated skill subdirectory names or `all`             |
+| `--all`                     | Optional              | Shortcut for `--skills all --agents all --yes`                |
 
 ### 3. 📋 List & Check Skills
 **Usage**: List all installed skills, check current capabilities, and verify sync status.
 ```bash
 python3 <path_to_skill_manager>/scripts/list_skills.py --brief
 ```
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `--brief` | Recommended | One line per skill (compact output for agents with limited display) |
-| `--scope <global\|project>` | Optional | Filter by scope |
+| Argument                    | Required    | Description                                                         |
+| --------------------------- | ----------- | ------------------------------------------------------------------- |
+| `--brief`                   | Recommended | One line per skill (compact output for agents with limited display) |
+| `--scope <global\|project>` | Optional    | Filter by scope                                                     |
 
 ### 4. 🔄 Sync Skill
 **Usage**: Fix missing tools or sync to a new agent environment.
 ```bash
 python3 <path_to_skill_manager>/scripts/sync_skill.py <skill_name> --scope <global|project> --agents <ids|all>
 ```
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `<skill_name>` | Yes | Name of the installed skill |
-| `--scope <global\|project>` | Optional | Scope (auto-detected if omitted) |
-| `--agents <ids\|all>` | Yes | Comma-separated agent IDs or `all`. **Ask user** which agents to sync to. |
+| Argument                    | Required | Description                                                               |
+| --------------------------- | -------- | ------------------------------------------------------------------------- |
+| `<skill_name>`              | Yes      | Name of the installed skill                                               |
+| `--scope <global\|project>` | Optional | Scope (auto-detected if omitted)                                          |
+| `--agents <ids\|all>`       | Yes      | Comma-separated agent IDs or `all`. **Ask user** which agents to sync to. |
 
 ### 5. 🆙 Update Skills
 **Usage**: Update installed skills to latest versions.
 ```bash
 python3 <path_to_skill_manager>/scripts/update_skills.py --all --scope <global|project>
 ```
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `--all` | Yes | Update all Git-based skills without prompting |
-| `--scope <global\|project>` | Yes | Target scope |
-| `--npx` | Optional | Also run `npx skills update` |
-| `<skill_names...>` | Alternative to `--all` | Specific skill names to update |
+| Argument                    | Required               | Description                                   |
+| --------------------------- | ---------------------- | --------------------------------------------- |
+| `--all`                     | Yes                    | Update all Git-based skills without prompting |
+| `--scope <global\|project>` | Yes                    | Target scope                                  |
+| `--npx`                     | Optional               | Also run `npx skills update`                  |
+| `<skill_names...>`          | Alternative to `--all` | Specific skill names to update                |
 
 ### 6. 🗑️ Uninstall Skill
 **Usage**: Remove a skill and clean up configurations.
 ```bash
 python3 <path_to_skill_manager>/scripts/uninstall_skill.py <skill_name> --scope <global|project> --all-locations
 ```
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `<skill_name>` | Yes | Name of the skill to uninstall |
-| `--scope <global\|project>` | Yes | Target scope. Ask user if unclear. |
-| `--all-locations` | Recommended | Remove from all detected locations |
+| Argument                    | Required    | Description                        |
+| --------------------------- | ----------- | ---------------------------------- |
+| `<skill_name>`              | Yes         | Name of the skill to uninstall     |
+| `--scope <global\|project>` | Yes         | Target scope. Ask user if unclear. |
+| `--all-locations`           | Recommended | Remove from all detected locations |
 
 ## 🧠 Agent Protocol
 

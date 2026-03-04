@@ -355,18 +355,17 @@ def create_symlink(source: Path, target: Path, force: bool = False):
     """Create symlink from target to source."""
     target.parent.mkdir(parents=True, exist_ok=True)
 
-    if target.exists():
+    if target.exists() or target.is_symlink():
         if not force:
             print(f"   ⚠️  Skipping {target} (exists, use force to overwrite)")
             return
 
         if target.is_symlink():
             target.unlink()
+        elif target.is_dir():
+            shutil.rmtree(target)
         else:
-            if target.is_dir():
-                shutil.rmtree(target)
-            else:
-                target.unlink()
+            target.unlink()
 
     target.symlink_to(source)
 
@@ -388,6 +387,9 @@ def ask_sync_targets(
 
     # 非交互模式：通过 agent_ids 参数直接指定
     if agent_ids is not None:
+        if not agent_ids:
+            return []  # Explicitly empty means skip
+
         if agent_ids == ["all"]:
             selected = list(available_platforms.keys())
             print(f"\n✅ Selected (--agents all): {len(selected)} agents")
@@ -580,6 +582,7 @@ def _install_single_skill(
     commit_hash: Optional[str] = None,
     agent_ids: list[str] = None,
     auto_yes: bool = False,
+    is_npx: bool = False,
 ):
     """
     安装单个 skill 的完整流程（从 conflict 检查到 sync）。
@@ -607,16 +610,25 @@ def _install_single_skill(
     print(f"   ✅ Stored at: {repo_path}")
 
     # 选择同步目标
-    sync_targets = ask_sync_targets(
-        available_platforms, scope == "project", agent_ids=agent_ids
-    )
+    if agent_ids is None:
+        # If not provided in CLI, default to empty (no sync) in ASM context
+        sync_targets = []
+    else:
+        sync_targets = ask_sync_targets(
+            available_platforms, scope == "project", agent_ids=agent_ids
+        )
 
     # 同步到平台
-    sync_to_platforms(repo_path, skill_name, sync_targets, available_platforms, force)
+    if sync_targets:
+        sync_to_platforms(
+            repo_path, skill_name, sync_targets, available_platforms, force
+        )
 
     # 更新 metadata
     final_source_type = config.SOURCE_TYPE_LOCAL
-    if is_git:
+    if is_npx:
+        final_source_type = config.SOURCE_TYPE_NPX
+    elif is_git:
         final_source_type = config.SOURCE_TYPE_GIT
     elif (repo_path / ".git").exists():
         final_source_type = config.SOURCE_TYPE_GIT
@@ -655,6 +667,7 @@ def main():
     )
     parser.add_argument(
         "--agents",
+        "-a",
         nargs="?",
         const="",
         default=None,
@@ -662,13 +675,20 @@ def main():
     )
     parser.add_argument(
         "--yes",
+        "-y",
         action="store_true",
         help="Non-interactive: auto-confirm overwrites",
     )
     parser.add_argument(
         "--skills",
+        "-s",
         default=None,
         help="Non-interactive: comma-separated skill subdirectory names for multi-skill repos, or 'all'",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Install all skills found to all agents",
     )
 
     args = parser.parse_args()
@@ -681,6 +701,12 @@ def main():
     cli_skill_names = None
     if args.skills is not None:
         cli_skill_names = [s.strip() for s in args.skills.split(",") if s.strip()]
+
+    # Handle --all flag override
+    if args.all:
+        agent_ids = ["all"]
+        cli_skill_names = ["all"]
+        args.yes = True
 
     # Handle deprecated --local flag
     if args.local:
@@ -789,6 +815,7 @@ def main():
                             commit_hash=current_hash,
                             agent_ids=agent_ids,
                             auto_yes=args.yes,
+                            is_npx=False,
                         )
                     print(f"\n✅ All {len(selected)} skill(s) installed!")
                     return  # 多 skill 安装完毕，直接返回
@@ -836,9 +863,19 @@ def main():
                 skill_name = source_input
                 if install_via_npx(skill_name, args.scope):
                     # If successful, the skill is now in the repo
-                    is_npx = True
                     source_path = config.get_skill_repo(args.scope) / skill_name
                     print(f"✅ Successfully installed '{skill_name}' via Registry!")
+
+                    # Ensure it follows the sync flow
+                    _install_single_skill(
+                        source_path=source_path,
+                        skill_name=skill_name,
+                        scope=args.scope,
+                        agent_ids=agent_ids,
+                        auto_yes=args.yes,
+                        is_npx=True,
+                    )
+                    return
                 else:
                     print(
                         f"❌ Error: '{source_input}' is not a valid path, Git URL, or Registry skill."
@@ -895,6 +932,7 @@ def main():
             commit_hash=inherited_hash,
             agent_ids=agent_ids,
             auto_yes=args.yes,
+            is_npx=False,
         )
 
     finally:

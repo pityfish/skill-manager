@@ -134,32 +134,36 @@ def get_synced_symlinks(skill_name: str, locations: dict) -> list[str]:
 
 def cleanup_metadata(skill_name: str, canonical_name: str = None):
     """Clean up metadata for both scopes after uninstallation."""
-    target_key = canonical_name or skill_name
+    keys_to_check = [skill_name]
+    if canonical_name and canonical_name != skill_name:
+        keys_to_check.insert(0, canonical_name)
+
     for scope in ["global", "project"]:
         metadata = config.load_metadata(scope)
-        if target_key not in metadata:
-            continue
+        for target_key in keys_to_check:
+            if target_key not in metadata:
+                continue
 
-        # Check if source (repo) still exists
-        repo_path = config.get_skill_repo(scope) / skill_name
-        if not repo_path.exists():
-            del metadata[target_key]
-            config.save_metadata(metadata, scope)
-            # print(f"   ✅ Removed {target_key} from {scope} metadata")
-            continue
+            # Check if source (repo) still exists
+            repo_path = config.get_skill_repo(scope) / skill_name
+            if not repo_path.exists():
+                del metadata[target_key]
+                config.save_metadata(metadata, scope)
+                # print(f"   ✅ Removed {target_key} from {scope} metadata")
+                continue
 
-        # Check targets
-        current_targets = metadata[target_key].get("targets", [])
-        valid_targets = []
-        for t in current_targets:
-            t_path = Path(t)
-            if t_path.exists() or t_path.is_symlink():
-                valid_targets.append(t)
+            # Check targets
+            current_targets = metadata[target_key].get("targets", [])
+            valid_targets = []
+            for t in current_targets:
+                t_path = Path(t)
+                if t_path.exists() or t_path.is_symlink():
+                    valid_targets.append(t)
 
-        if len(valid_targets) != len(current_targets):
-            metadata[target_key]["targets"] = valid_targets
-            config.save_metadata(metadata, scope)
-            # print(f"   ✅ Updated {target_key} in {scope} metadata")
+            if len(valid_targets) != len(current_targets):
+                metadata[target_key]["targets"] = valid_targets
+                config.save_metadata(metadata, scope)
+                # print(f"   ✅ Updated {target_key} in {scope} metadata")
 
 
 def ask_skill_to_uninstall(scope: str) -> list[str]:
