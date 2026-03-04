@@ -355,56 +355,80 @@ def load_npx_skills_lock(scope: str = "global"):
     return {}
 
 
-def get_skill_source_type(skill_name: str, scope: str = "global") -> tuple[str, dict]:
+def get_skill_source_type(
+    skill_name: str, scope: str = "global"
+) -> tuple[str, dict, str]:
     """
     Determine the installation source of a skill.
-    Returns: (source_type, source_info)
+    Returns: (source_type, source_info, canonical_name)
 
     source_type: 'npx-skills', 'git', 'local', or 'unknown'
     source_info: dict with details about the source
+    canonical_name: the full key used in metadata (e.g. org/repo@skill)
     """
-    # Check npx skills lock first
+    # Check npx skills lock
     npx_lock = load_npx_skills_lock(scope)
     skills_in_lock = npx_lock.get("skills", {})
 
-    # 1. Direct match
+    # Check skill-manager metadata
+    metadata = load_metadata(scope)
+
+    # 1. Direct match in NPX lock
     if skill_name in skills_in_lock:
         info = skills_in_lock[skill_name]
-        return SOURCE_TYPE_NPX, {
-            "source": info.get("source", ""),
-            "source_url": info.get("sourceUrl", ""),
-            "installed_at": info.get("installedAt", ""),
-            "updated_at": info.get("updatedAt", ""),
-        }
-
-    # 2. Suffix match (for names like org/repo@skill_name)
-    for full_id, info in skills_in_lock.items():
-        if "@" in full_id and full_id.split("@")[-1] == skill_name:
-            return SOURCE_TYPE_NPX, {
+        return (
+            SOURCE_TYPE_NPX,
+            {
                 "source": info.get("source", ""),
                 "source_url": info.get("sourceUrl", ""),
                 "installed_at": info.get("installedAt", ""),
                 "updated_at": info.get("updatedAt", ""),
-            }
+            },
+            skill_name,
+        )
 
-    # Check skill-manager metadata
-    metadata = load_metadata(scope)
+    # 2. Direct match in skill-manager metadata
     if skill_name in metadata:
         info = metadata[skill_name]
         source_type = info.get("source_type", SOURCE_TYPE_UNKNOWN)
-        return source_type, info
+        return source_type, info, skill_name
 
-    # Check if it's a git repo
+    # 3. Suffix match in NPX lock (for names like org/repo@skill_name)
+    for full_id, info in skills_in_lock.items():
+        if "@" in full_id and full_id.split("@")[-1] == skill_name:
+            return (
+                SOURCE_TYPE_NPX,
+                {
+                    "source": info.get("source", ""),
+                    "source_url": info.get("sourceUrl", ""),
+                    "installed_at": info.get("installedAt", ""),
+                    "updated_at": info.get("updatedAt", ""),
+                },
+                full_id,
+            )
+
+    # 4. Suffix match in skill-manager metadata
+    for full_id, info in metadata.items():
+        if "@" in full_id and (
+            full_id.split("@")[-1] == skill_name
+            or ("/" in full_id and full_id.split("/")[-1] == skill_name)
+        ):
+            source_type = info.get("source_type", SOURCE_TYPE_UNKNOWN)
+            return source_type, info, full_id
+
+    # Check physical presence as fallback
     repo_path = get_skill_repo(scope)
     skill_path = repo_path / skill_name
+
+    # Check if it's a git repo
     if skill_path.exists() and (skill_path / ".git").exists():
-        return SOURCE_TYPE_GIT, {"source": str(skill_path)}
+        return SOURCE_TYPE_GIT, {"source": str(skill_path)}, skill_name
 
     # If exists but no metadata, it's unknown/local
     if skill_path.exists():
-        return SOURCE_TYPE_LOCAL, {"source": str(skill_path)}
+        return SOURCE_TYPE_LOCAL, {"source": str(skill_path)}, skill_name
 
-    return SOURCE_TYPE_UNKNOWN, {}
+    return SOURCE_TYPE_UNKNOWN, {}, skill_name
 
 
 def ask_scope_tui(title: str = "Select scope") -> str:
@@ -456,12 +480,13 @@ def get_all_skills_with_sources(scope: str = None) -> dict:
     if (not scope or scope == "global") and SKILL_REPO_GLOBAL.exists():
         for item in SKILL_REPO_GLOBAL.iterdir():
             if item.is_dir() and not item.name.startswith("."):
-                source_type, source_info = get_skill_source_type(
+                source_type, source_info, canonical_name = get_skill_source_type(
                     item.name, scope="global"
                 )
                 skills[item.name] = {
                     "source_type": source_type,
                     "source_info": source_info,
+                    "canonical_name": canonical_name,
                     "path": item,
                     "scope": "global",
                 }
@@ -483,7 +508,7 @@ def get_all_skills_with_sources(scope: str = None) -> dict:
     ):
         for item in SKILL_REPO_PROJECT.iterdir():
             if item.is_dir() and not item.name.startswith("."):
-                source_type, source_info = get_skill_source_type(
+                source_type, source_info, canonical_name = get_skill_source_type(
                     item.name, scope="project"
                 )
 
@@ -497,6 +522,7 @@ def get_all_skills_with_sources(scope: str = None) -> dict:
                     skills[key] = {
                         "source_type": source_type,
                         "source_info": source_info,
+                        "canonical_name": canonical_name,
                         "path": item,
                         "scope": "project",
                         "original_name": item.name,
@@ -505,6 +531,7 @@ def get_all_skills_with_sources(scope: str = None) -> dict:
                     skills[item.name] = {
                         "source_type": source_type,
                         "source_info": source_info,
+                        "canonical_name": canonical_name,
                         "path": item,
                         "scope": "project",
                     }

@@ -132,23 +132,24 @@ def get_synced_symlinks(skill_name: str, locations: dict) -> list[str]:
     return synced
 
 
-def cleanup_metadata(skill_name: str):
+def cleanup_metadata(skill_name: str, canonical_name: str = None):
     """Clean up metadata for both scopes after uninstallation."""
+    target_key = canonical_name or skill_name
     for scope in ["global", "project"]:
         metadata = config.load_metadata(scope)
-        if skill_name not in metadata:
+        if target_key not in metadata:
             continue
 
         # Check if source (repo) still exists
         repo_path = config.get_skill_repo(scope) / skill_name
         if not repo_path.exists():
-            del metadata[skill_name]
+            del metadata[target_key]
             config.save_metadata(metadata, scope)
-            # print(f"   ✅ Removed from {scope} metadata")
+            # print(f"   ✅ Removed {target_key} from {scope} metadata")
             continue
 
         # Check targets
-        current_targets = metadata[skill_name].get("targets", [])
+        current_targets = metadata[target_key].get("targets", [])
         valid_targets = []
         for t in current_targets:
             t_path = Path(t)
@@ -156,9 +157,9 @@ def cleanup_metadata(skill_name: str):
                 valid_targets.append(t)
 
         if len(valid_targets) != len(current_targets):
-            metadata[skill_name]["targets"] = valid_targets
+            metadata[target_key]["targets"] = valid_targets
             config.save_metadata(metadata, scope)
-            # print(f"   ✅ Updated {scope} metadata")
+            # print(f"   ✅ Updated {target_key} in {scope} metadata")
 
 
 def ask_skill_to_uninstall(scope: str) -> list[str]:
@@ -194,7 +195,10 @@ def ask_skill_to_uninstall(scope: str) -> list[str]:
 
 
 def uninstall_skill_selective(
-    skill_name: str, selected_keys: list[str], locations: dict
+    skill_name: str,
+    selected_keys: list[str],
+    locations: dict,
+    canonical_name: str = None,
 ):
     """Uninstall skill from selected locations only."""
     print(f"\n🗑️  Removing '{skill_name}'...\n")
@@ -208,7 +212,7 @@ def uninstall_skill_selective(
             continue
 
         scope = info["scope"]
-        source_type, _ = config.get_skill_source_type(skill_name, scope=scope)
+        source_type, _, _ = config.get_skill_source_type(skill_name, scope=scope)
 
         if source_type == config.SOURCE_TYPE_NPX:
             if scope not in removed_via_npx:
@@ -238,7 +242,7 @@ def uninstall_skill_selective(
             pass
 
     # Clean up metadata
-    cleanup_metadata(skill_name)
+    cleanup_metadata(skill_name, canonical_name=canonical_name)
 
     if removed_any:
         print(f"\n✅ Uninstall complete!")
@@ -367,6 +371,12 @@ def main():
                 k: v for k, v in locations.items() if v["scope"] == selected_scope
             }
 
+            # Find skills info from the scanned list to get canonical name
+            all_skills = config.get_all_skills_with_sources(scope=selected_scope)
+            canonical_name = None
+            if name in all_skills:
+                canonical_name = all_skills[name].get("canonical_name")
+
             # Apply platform filter if specified
             if platforms_to_filter:
                 filtered_locations = {}
@@ -399,7 +409,9 @@ def main():
                 print(f"⏩ Skipping '{name}' (no locations selected).")
                 continue
 
-            uninstall_skill_selective(name, keys_to_remove, scope_locations)
+            uninstall_skill_selective(
+                name, keys_to_remove, scope_locations, canonical_name=canonical_name
+            )
         return
 
     # Case 2: 指定了 skill name
@@ -456,7 +468,9 @@ def main():
         print(f"   {info['name']}: {info['path']} [{type_str}]{synced_mark}")
 
     # Check source type for NPX logic
-    source_type, _ = config.get_skill_source_type(skill_name, scope=selected_scope)
+    source_type, _, canonical_name = config.get_skill_source_type(
+        skill_name, scope=selected_scope
+    )
     if source_type == config.SOURCE_TYPE_NPX:
         print(
             f"\nℹ️  This skill is installed via 'npx skills' in {selected_scope} scope."
@@ -475,7 +489,9 @@ def main():
         print("❌ No locations selected/Cancelled.")
         return
 
-    uninstall_skill_selective(skill_name, keys_to_remove, final_locations)
+    uninstall_skill_selective(
+        skill_name, keys_to_remove, final_locations, canonical_name=canonical_name
+    )
 
 
 if __name__ == "__main__":
