@@ -329,6 +329,11 @@ def main():
         action="store_true",
         help="Non-interactive: remove from all detected locations (skip location TUI)",
     )
+    parser.add_argument(
+        "--platforms",
+        "-p",
+        help="Only uninstall from these platforms (comma-separated IDs)",
+    )
 
     args = parser.parse_args()
 
@@ -348,6 +353,12 @@ def main():
             print("❌ No skills selected for uninstallation.")
             return
 
+        platforms_to_filter = []
+        if args.platforms:
+            platforms_to_filter = [
+                p.strip() for p in args.platforms.split(",") if p.strip()
+            ]
+
         for name in skills_to_remove:
             print(f"\n--- Processing '{name}' ---")
             locations = get_skill_locations(name)
@@ -355,6 +366,21 @@ def main():
             scope_locations = {
                 k: v for k, v in locations.items() if v["scope"] == selected_scope
             }
+
+            # Apply platform filter if specified
+            if platforms_to_filter:
+                filtered_locations = {}
+                for k, v in scope_locations.items():
+                    if v.get("platform_id") in platforms_to_filter:
+                        filtered_locations[k] = v
+
+                if not filtered_locations:
+                    print(
+                        f"⚠️  No matching platforms found for '{name}' among: {', '.join(platforms_to_filter)}"
+                    )
+                    continue
+                scope_locations = filtered_locations
+
             if not scope_locations:
                 print(
                     f"⚠️  Unexpected error: Skill '{name}' not found in {selected_scope} scope anymore."
@@ -403,6 +429,24 @@ def main():
     final_locations = {
         k: v for k, v in locations.items() if v["scope"] == selected_scope
     }
+
+    # Apply platform filter if specified
+    if args.platforms:
+        platforms_to_filter = [
+            p.strip() for p in args.platforms.split(",") if p.strip()
+        ]
+        filtered_locations = {}
+        for k, v in final_locations.items():
+            if v.get("platform_id") in platforms_to_filter:
+                filtered_locations[k] = v
+
+        if not filtered_locations:
+            print(
+                f"❌ No matching platforms found for '{skill_name}' among: {', '.join(platforms_to_filter)}"
+            )
+            sys.exit(1)
+        final_locations = filtered_locations
+
     synced_symlinks = get_synced_symlinks(skill_name, final_locations)
 
     print(f"\n📦 Skill '{skill_name}' ({selected_scope.capitalize()}) found in:")
