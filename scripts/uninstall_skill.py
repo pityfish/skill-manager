@@ -56,9 +56,69 @@ def get_skill_locations(skill_name: str) -> dict:
     """Get all locations where skill exists (Global & Project)."""
     locations = {}
 
-    # 1. Global Repo
+    # 1. Consultant metadata first for potential hierarchical paths
+    for scope in ["global", "project"]:
+        metadata = config.load_metadata(scope)
+        # Try exact match or suffix match in metadata keys
+        matched_key = None
+        if skill_name in metadata:
+            matched_key = skill_name
+        else:
+            for k in metadata:
+                if "@" in k and k.split("@")[-1] == skill_name:
+                    matched_key = k
+                    break
+                elif "/" in k and k.split("/")[-1] == skill_name:
+                    matched_key = k
+                    break
+
+        if matched_key:
+            info = metadata[matched_key]
+            source_path = Path(info.get("source", ""))
+            if source_path and (source_path.exists() or source_path.is_symlink()):
+                target_path = None
+                try:
+                    target_path = (
+                        source_path.resolve() if source_path.is_symlink() else None
+                    )
+                except Exception:
+                    # Handle broken symlinks or loops gracefully
+                    pass
+
+                key_prefix = f"{scope}_repo"
+                locations[key_prefix] = {
+                    "name": f"{scope.capitalize()} Repo",
+                    "path": source_path,
+                    "is_symlink": source_path.is_symlink(),
+                    "target": target_path,
+                    "scope": scope,
+                    "canonical_name": matched_key,
+                }
+
+            # Also check recorded targets for this specific metadata entry
+            for t_idx, t_path_str in enumerate(info.get("targets", [])):
+                t_path = Path(t_path_str)
+                if t_path.exists() or t_path.is_symlink():
+                    t_target = None
+                    try:
+                        t_target = t_path.resolve() if t_path.is_symlink() else None
+                    except Exception:
+                        pass
+
+                    locations[f"{scope}_target_{t_idx}"] = {
+                        "name": f"{scope.capitalize()} Link: {t_path.name}",
+                        "path": t_path,
+                        "is_symlink": t_path.is_symlink(),
+                        "target": t_target,
+                        "scope": scope,
+                    }
+
+    # 2. Add fallback/manual scanning for simple names (compatibility)
+    # Global Repo
     global_repo = config.SKILL_REPO_GLOBAL / skill_name
-    if global_repo.exists() or global_repo.is_symlink():
+    if "global_repo" not in locations and (
+        global_repo.exists() or global_repo.is_symlink()
+    ):
         locations["global_repo"] = {
             "name": "Global Repo",
             "path": global_repo,
@@ -67,9 +127,11 @@ def get_skill_locations(skill_name: str) -> dict:
             "scope": "global",
         }
 
-    # 2. Project Repo
+    # Project Repo
     project_repo = config.SKILL_REPO_PROJECT / skill_name
-    if project_repo.exists() or project_repo.is_symlink():
+    if "project_repo" not in locations and (
+        project_repo.exists() or project_repo.is_symlink()
+    ):
         locations["project_repo"] = {
             "name": "Project Repo",
             "path": project_repo,
@@ -78,36 +140,30 @@ def get_skill_locations(skill_name: str) -> dict:
             "scope": "project",
         }
 
-    # 3. Global Platforms
-    global_platforms = config.get_available_platforms()
-    for p_id, info in global_platforms.items():
-        path = info["path"] / skill_name
-        if path.exists() or path.is_symlink():
-            is_symlink = path.is_symlink()
-            locations[f"global_{p_id}"] = {
-                "name": f"Global {info['name']}",
-                "path": path,
-                "is_symlink": is_symlink,
-                "target": path.resolve() if is_symlink else None,
-                "scope": "global",
-                "platform_id": p_id,
-            }
+    # Platforms Scanning (for robustness)
+    platform_scopes = [("global", config.get_available_platforms())]
+    if config.PROJECT_ROOT:
+        project_platforms = {}
+        for name, conf in config.SUPPORTED_PLATFORMS.items():
+            path = config.PROJECT_ROOT / conf["local"]
+            if path.exists():
+                project_platforms[conf["id"]] = {"name": name, "path": path}
+        platform_scopes.append(("project", project_platforms))
 
-    # 4. Project Platforms
-    # Check manual project locations based on supported platforms
-    for name, conf in config.SUPPORTED_PLATFORMS.items():
-        # Check if parent config exists to be considered "available" or if the skill just exists there
-        local_path = config.PROJECT_ROOT / conf["local"] / skill_name
-        if local_path.exists() or local_path.is_symlink():
-            is_symlink = local_path.is_symlink()
-            locations[f"project_{conf['id']}"] = {
-                "name": f"Project {name}",
-                "path": local_path,
-                "is_symlink": is_symlink,
-                "target": local_path.resolve() if is_symlink else None,
-                "scope": "project",
-                "platform_id": conf["id"],
-            }
+    for scope_name, platforms in platform_scopes:
+        for p_id, info in platforms.items():
+            path = info["path"] / skill_name
+            if path.exists() or path.is_symlink():
+                loc_key = f"{scope_name}_{p_id}"
+                if loc_key not in locations:
+                    locations[loc_key] = {
+                        "name": f"{scope_name.capitalize()} {info['name']}",
+                        "path": path,
+                        "is_symlink": path.is_symlink(),
+                        "target": path.resolve() if path.is_symlink() else None,
+                        "scope": scope_name,
+                        "platform_id": p_id,
+                    }
 
     return locations
 
@@ -145,7 +201,15 @@ def cleanup_metadata(skill_name: str, canonical_name: str = None):
                 continue
 
             # Check if source (repo) still exists
-            repo_path = config.get_skill_repo(scope) / skill_name
+            # We use the explicitly recorded source if available, fallback to default naming
+            info = metadata[target_key]
+            repo_path_str = info.get("source")
+            repo_path = (
+                Path(repo_path_str)
+                if repo_path_str
+                else (config.get_skill_repo(scope) / skill_name)
+            )
+
             if not repo_path.exists():
                 del metadata[target_key]
                 config.save_metadata(metadata, scope)
@@ -153,7 +217,7 @@ def cleanup_metadata(skill_name: str, canonical_name: str = None):
                 continue
 
             # Check targets
-            current_targets = metadata[target_key].get("targets", [])
+            current_targets = info.get("targets", [])
             valid_targets = []
             for t in current_targets:
                 t_path = Path(t)
@@ -238,15 +302,42 @@ def uninstall_skill_selective(
         info = locations[key]
         path = info["path"]
 
+        # If it was supposed to be removed via npx, but npx didn't delete THIS specific path
+        # (happens for hierarchical paths), we delete it manually.
         if remove_path(path):
             print(f"   ✅ Removed from {info['name']}: {path}")
             removed_any = True
-        elif key not in [f"{s}_repo" for s in removed_via_npx]:
-            # Only warn if it wasn't already handle by npx remove
-            pass
+        elif (
+            "repo" in key
+            and path.exists()
+            and any(s == info.get("scope") for s in removed_via_npx)
+        ):
+            # Force remove if it's a repo path and npx said it handled that scope but the file is still there
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+            print(f"   ✅ Cleaned up leftover repo path: {path}")
+            removed_any = True
 
     # Clean up metadata
     cleanup_metadata(skill_name, canonical_name=canonical_name)
+
+    # Extra check: if it's NPX based, try to clean up the parent directory if empty
+    if removed_any and canonical_name and "/" in canonical_name:
+        for scope in ["global", "project"]:
+            repo_root = config.get_skill_repo(scope)
+            parent_dir = repo_root / canonical_name.split("/")[0]
+            if (
+                parent_dir.exists()
+                and parent_dir.is_dir()
+                and not any(parent_dir.iterdir())
+            ):
+                try:
+                    parent_dir.rmdir()
+                    # print(f"   ✅ Removed empty namespace directory: {parent_dir}")
+                except Exception:
+                    pass
 
     if removed_any:
         print(f"\n✅ Uninstall complete!")

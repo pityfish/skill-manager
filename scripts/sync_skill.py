@@ -47,44 +47,22 @@ def main():
     if args.agents is not None:
         agent_ids = [a.strip() for a in args.agents.split(",") if a.strip()]
 
-    # Auto-detect scope if not provided
-    if scope is None:
-        # Check if we are in a project context
-        is_in_project = (config.PROJECT_ROOT / ".agents").exists() or (
-            config.PROJECT_ROOT / ".git"
-        ).exists()
+    # Find the skill using robust search (supports hierarchical paths)
+    skill_info = config.find_installed_skill(skill_name, scope=scope)
 
-        # Check where the skill actually exists
-        global_path = config.SKILL_REPO_GLOBAL / skill_name
-        project_path = config.SKILL_REPO_PROJECT / skill_name
-
-        if is_in_project and project_path.exists():
-            scope = "project"
-            print(f"🏠 Found skill '{skill_name}' in Project Repo.")
-        elif global_path.exists():
-            scope = "global"
-            print(f"🌍 Found skill '{skill_name}' in Global Repo.")
-        else:
-            # Fallback logic if detection fails but context implies something
-            if is_in_project:
-                print(
-                    "🏠 Project context detected, but skill not found in Project Repo."
-                )
-                if global_path.exists():
-                    print("   Using Global skill instead.")
-                    scope = "global"
-                else:
-                    scope = "project"  # Will fail later
-            else:
-                scope = "global"
-
-    repo_path = config.get_skill_repo(scope)
-    skill_path = repo_path / skill_name
-
-    if not skill_path.exists():
-        print(f"❌ Skill '{skill_name}' not found in {scope} repo ({repo_path})")
+    if not skill_info:
+        msg_scope = f" in {scope} scope" if scope else ""
+        print(f"❌ Skill '{skill_name}' not found{msg_scope}.")
         print(f"   Run 'python3 scripts/install_skill.py ...' to install it first.")
         sys.exit(1)
+
+    # Use the detected/confirmed information
+    skill_path = skill_info["path"]
+    scope = skill_info["scope"]
+    # We might want to use the canonical name for metadata updates later
+    canonical_name = skill_info.get("canonical_name", skill_name)
+
+    print(f"🏠 Found skill '{skill_name}' in {scope.capitalize()} Repo.")
 
     print(f"\n🔗 Syncing skill: {skill_name}")
     print(f"   Source: {skill_path}")

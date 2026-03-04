@@ -475,43 +475,28 @@ def main():
     if args.skills:
         # Handle each requested skill
         for name in args.skills:
-            # Find matches for this skill name across all scopes
-            matches = []
-            for key, info in all_skills_map.items():
-                if key == name or info.get("original_name") == name:
-                    matches.append(info)
-
-            if not matches:
-                print(f"❌ Skill '{name}' not found.")
-                continue
-
-            # Decide which one to update
-            selected_info = None
-            if len(matches) > 1:
-                # Exists in multiple scopes, need to ask
-                scopes_found = [m["scope"] for m in matches]
-                print(
-                    f"🔍 Skill '{name}' found in multiple scopes: {', '.join(scopes_found)}"
-                )
-                choice = config.ask_scope_tui(f"Select scope to update '{name}':")
-                for m in matches:
-                    if m["scope"] == choice:
-                        selected_info = m
-                        break
-            else:
-                selected_info = matches[0]
+            # Use find_installed_skill for robust lookup (supports hierarchical paths)
+            selected_info = config.find_installed_skill(name, scope=args.scope)
 
             if not selected_info:
-                print(f"⚠️  Skipping '{name}' (no scope selected).")
+                print(f"❌ Skill '{name}' not found.")
                 continue
 
             path = selected_info["path"]
             source_type = selected_info.get("source_type")
             scope = selected_info.get("scope", "global")
 
-            # Process based on source type
+            # 检查是否是子目录类型的 git skill
+            source_info = selected_info.get("source_info", {})
+            source_subdir = (
+                source_info.get("source_subdir")
+                if isinstance(source_info, dict)
+                else None
+            )
+
             if source_type == config.SOURCE_TYPE_NPX:
                 print(f"📦 Skill '{name}' is an npx skill (Scope: {scope}).")
+                # ... resto de la lógica de npx ...
                 if scope == "global":
                     print("   Running 'npx skills update -g' (Global)...")
                     try:

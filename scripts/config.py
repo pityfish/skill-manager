@@ -341,6 +341,32 @@ def save_metadata(metadata, scope: str = "global"):
         json.dump(metadata, f, indent=2)
 
 
+def find_installed_skill(name: str, scope: str = None) -> dict:
+    """
+    Find an installed skill by name (short name or canonical name).
+    Returns: { "path": Path, "scope": str, "metadata": dict, "canonical_name": str } or None
+    """
+    # Use robust searching to find the skill across scopes
+    all_skills = get_all_skills_with_sources(scope=scope)
+
+    # 1. Try exact match on key (could be short name or canonical name)
+    if name in all_skills:
+        return all_skills[name]
+
+    # 2. Try match on canonical_name
+    for k, info in all_skills.items():
+        if info.get("canonical_name") == name:
+            return info
+
+    # 3. Try match on suffix (e.g., 'pptx' matches 'anthropics/skills@pptx')
+    for k, info in all_skills.items():
+        c_name = info.get("canonical_name")
+        if c_name and (c_name.endswith(f"@{name}") or c_name.endswith(f"/{name}")):
+            return info
+
+    return None
+
+
 def load_npx_skills_lock(scope: str = "global"):
     """Load npx skills lock file."""
     lock_path = (
@@ -472,69 +498,86 @@ def get_all_skills_with_sources(scope: str = None) -> dict:
     """
     Get all skills with their source information.
     If scope is provided, only return skills from that scope.
-    Returns: { skill_name: { "source_type": str, "source_info": dict, "path": Path, "scope": str } }
+    Returns: { skill_name: { "source_type": str, "source_info": dict, "path": Path, "scope": str, "canonical_name": str } }
     """
     skills = {}
 
-    # Scan global repo
-    if (not scope or scope == "global") and SKILL_REPO_GLOBAL.exists():
-        for item in SKILL_REPO_GLOBAL.iterdir():
+    scopes_to_check = [scope] if scope else ["global", "project"]
+
+    for s in scopes_to_check:
+        repo_path = get_skill_repo(s)
+        if not repo_path.exists():
+            continue
+
+        # 1. Scan physical directories (Top level)
+        for item in repo_path.iterdir():
             if item.is_dir() and not item.name.startswith("."):
                 source_type, source_info, canonical_name = get_skill_source_type(
-                    item.name, scope="global"
+                    item.name, scope=s
                 )
-                skills[item.name] = {
+
+                # Use unique key if collision
+                key = item.name
+                if key in skills and skills[key]["scope"] != s:
+                    key = f"{item.name} ({s})"
+
+                skills[key] = {
                     "source_type": source_type,
                     "source_info": source_info,
                     "canonical_name": canonical_name,
                     "path": item,
-                    "scope": "global",
+                    "scope": s,
+                    "original_name": item.name,
                 }
 
-    # Scan project repo
-    # IMPORTANT: Avoid scanning twice if Project and Global repos are physically the same
-    # This happens when operating in the HOME directory.
-    is_same_repo = False
-    if SKILL_REPO_GLOBAL.exists() and SKILL_REPO_PROJECT.exists():
-        try:
-            is_same_repo = SKILL_REPO_GLOBAL.resolve() == SKILL_REPO_PROJECT.resolve()
-        except Exception:
-            pass
+        # 2. Integrate hierarchal skills from metadata
+        metadata = load_metadata(s)
+        for canonical_name, info in metadata.items():
+            source_path_str = info.get("source")
+            if not source_path_str:
+                continue
 
-    if (
-        (not scope or scope == "project")
-        and SKILL_REPO_PROJECT.exists()
-        and not is_same_repo
-    ):
-        for item in SKILL_REPO_PROJECT.iterdir():
-            if item.is_dir() and not item.name.startswith("."):
-                source_type, source_info, canonical_name = get_skill_source_type(
-                    item.name, scope="project"
-                )
+            source_path = Path(source_path_str)
 
-                if item.name in skills:
-                    # If skill exists in both, uniquely identify them or keep both
-                    # For filtering purposes, if user asked for "project", they get project.
-                    # If they asked for "None" (all), we might have collision.
-                    # Let's keep the project one but avoid losing the global one if possible.
-                    # Actually, for the manager's list view, we might want unique keys.
-                    key = f"{item.name} (project)" if not scope else item.name
-                    skills[key] = {
-                        "source_type": source_type,
-                        "source_info": source_info,
-                        "canonical_name": canonical_name,
-                        "path": item,
-                        "scope": "project",
-                        "original_name": item.name,
-                    }
-                else:
-                    skills[item.name] = {
-                        "source_type": source_type,
-                        "source_info": source_info,
-                        "canonical_name": canonical_name,
-                        "path": item,
-                        "scope": "project",
-                    }
+            # Check if it was already found in top-level scan
+            already_in = False
+            for k, existing in skills.items():
+                if (
+                    existing.get("canonical_name") == canonical_name
+                    and existing.get("scope") == s
+                ):
+                    already_in = True
+                    break
+
+            if already_in:
+                continue
+
+            # Only add if it actually exists (avoid orphans)
+            if source_path.exists() or source_path.is_symlink():
+                # Use the short name (after @ or /) if possible for the key,
+                # but ensure uniqueness
+                short_name = canonical_name.split("@")[-1].split("/")[-1]
+                key = short_name
+
+                # Handle collision
+                if key in skills:
+                    if skills[key]["scope"] != s:
+                        key = f"{short_name} ({s})"
+                    else:
+                        key = canonical_name  # Use full name if name collision within same scope
+
+                skills[key] = {
+                    "source_type": info.get("source_type", SOURCE_TYPE_UNKNOWN),
+                    "source_info": {
+                        "source_url": info.get("source_url"),
+                        "source_subdir": info.get("source_subdir"),
+                        "commit_hash": info.get("commit_hash"),
+                    },
+                    "canonical_name": canonical_name,
+                    "path": source_path,
+                    "scope": s,
+                    "original_name": short_name,
+                }
 
     return skills
 
